@@ -1,0 +1,40 @@
+name = "timely"
+version = "0.1.0"
+description = "Performant asynchronous redis rate-limiting algorithms"
+authors = ["Sondre Lillebø Gundersen <sondrelg@live.no>"]
+readme = "README.md"
+license = 'BSD-3'
+keywords = [
+    "distributed",
+    "async",
+    "rate-limit", "rate", "limit", "limiting",
+    "redis",
+    "rust"
+]
+
+[project.urls]
+releases = "github.com/sondrelg/timely/releases"
+
+[build-system]
+requires = ["maturin>=0.13,<0.14"]
+build-backend = "maturin"
+
+[project]
+name = "timely"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[tool.black]
+line-length = 120
+skip-string-normalization = true
+quiet = true
+preview = true
+target-version = ["py38"]
+
+[tool.isort]
+profile = "black"
+line_length = 120

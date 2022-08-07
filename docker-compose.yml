@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  redis:
+    container_name: 'timely-redis'
+    image: redis:6.2.5-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - '127.0.0.1:6389:6379'

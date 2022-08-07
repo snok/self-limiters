@@ -1,0 +1,20 @@
+[package]
+name = "timely"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "timely"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
+pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
+tokio = "^1.20.1"
+redis = { version="^0.21.5", features = ["aio", "tokio-comp"] }
+redlock = "^1.2.0"
+log = "0.4.17"
+pyo3-log = "^0.6.0"
+nanoid = "^0.4.0"
+chrono = "^0.4.20"
+redis-derive = "^0.1.6"
