@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 
 # class TokenBucket:
 #     name: str
@@ -14,8 +14,17 @@ from typing import Any
 #     ) -> None: ...
 
 class RedisSemaphore:
-    def __init__(self, name: str, capacity: int, redis_url: str) -> None: ...
+    def __init__(
+        self,
+        name: str,
+        capacity: int,
+        redis_url: str,
+        sleep_duration: Optional[float] = None,
+        max_position: Optional[int] = None,
+    ) -> None: ...
 
     queue_key: str
     client: Any
     identifier: str
+    sleep_duration: float
+    max_position: int
