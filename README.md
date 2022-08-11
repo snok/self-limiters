@@ -1,27 +1,22 @@
 # Timely
 
-> This is currently a work in progress. Not yet ready for use.
+> This is currently a work in progress. It is not yet ready for use.
 
-Timely provides a way to rate-limit your own services.
+Timely provides rate limiting context managers for Python.
+
+The implementation is redis-based, async first, and is
+implemented in Rust for increased precision and better parallelism.
 
 The library contains an implementation for *concurrency-based* time limits,
 using a [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
 and an implementation for *time-based* rate limits, using implementing a
-[token bucket](https://en.wikipedia.org/wiki/Token_bucket). 
-
-The implementations are:
-
-- Async
-- Distributed
-- Fair (FIFO)
-- Performant
-
-The package is written in Rust for better parallelism.
+[token bucket](https://en.wikipedia.org/wiki/Token_bucket). Both implementations
+are FIFO, and sleep asynchronously until ready.
 
 ## Installation
 
 ```bash
-pip install timely
+pip install timely-rq
 ```
 
 ## The semaphore implementation

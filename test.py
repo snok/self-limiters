@@ -10,7 +10,7 @@ log_format = '[%(asctime)s] [%(levelname)s] - %(message)s'
 logging.basicConfig(level='INFO', format=log_format)
 
 # Build and install
-import_hook.install(bindings='pyo3', release=True)
+import_hook.install(bindings='pyo3')
 
 from timely import RedisSemaphore  # noqa
 
