@@ -1,29 +1,34 @@
 # Timely
 
-> This is currently a work in progress. It is not yet ready for use.
+> This is currently a work in progress.
 
-Timely provides rate limiting context managers for Python.
+Timely provides a way to rate-limit your Python code.
 
-The implementation is redis-based, async first, and is
-implemented in Rust for increased precision and better parallelism.
+The package contains an implementation for concurrency-based time limits
+([semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming))),
+and an implementation for time-based rate limits
+([token bucket](https://en.wikipedia.org/wiki/Token_bucket)).
 
-The library contains an implementation for *concurrency-based* time limits,
-using a [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
-and an implementation for *time-based* rate limits, using implementing a
-[token bucket](https://en.wikipedia.org/wiki/Token_bucket). Both implementations
-are FIFO, and sleep asynchronously until ready.
+Both rate-limiters are:
+
+- Async
+- Distributed (using Redis)
+- Fair (FIFO)
+- Performant
+
+The package is written in Rust for improved parallelism.
 
 ## Installation
 
 ```bash
-pip install timely-rq
+pip install timely
 ```
 
 ## The semaphore implementation
 
 The semaphore implementation is a concurrency based rate limiter.
-It should be used to make sure that you e.g., don't have more than `n`
-active requests to a restricted resource at the same time.
+It's useful, e.g., to make sure there only `n`active requests to a
+restricted resource at the same time.
 
 The flow goes roughly like this:
 
@@ -37,8 +42,8 @@ It is implemented as a context manager in Python and can be used as follows:
 from timely import RedisSemaphore
 
 async with RedisSemaphore(
-    name="my-api-rate-limit",
-    capacity=10,
+    name="my-api-queue",  # unique name for the resource we're limiting
+    capacity=10,  # 10 concurrent requests are allowed
     redis_url="redis://localhost:6379"
 ):
     # Perform the rate-limited work immediately
