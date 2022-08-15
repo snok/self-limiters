@@ -80,3 +80,10 @@ while True:
         # Perform the rate-limited work immediately
         ...
 ```
+
+## todos
+
+- [ ] Finish first draft of token bucket implementation
+- [ ] Create [benchmarks](https://doc.rust-lang.org/cargo/commands/cargo-bench.html)
+- [ ] Add python tests
+- [ ] Set up build and publish pipeline
