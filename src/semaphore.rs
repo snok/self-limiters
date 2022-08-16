@@ -1,5 +1,6 @@
 extern crate redis;
 
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use crossbeam_channel::{bounded, Receiver};
@@ -11,7 +12,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
 use redis::aio::Connection;
-use redis::{parse_redis_url, Client, RedisError as RedisLibError};
+use redis::{parse_redis_url, AsyncCommands, Client, LposOptions, RedisError as RedisLibError};
 
 // Calculates appropriate sleep duration for a given node
 // Sleeps longer when nodes are further back in the queue.
@@ -79,11 +80,7 @@ impl SharedState {
 
     async fn wait_for_slot(self, connection: &mut Connection) -> Result<(), SemaphoreError> {
         // Enter a queue and get the current position
-        let mut position = redis::cmd("RPUSH")
-            .arg(&self.queue_key)
-            .arg(&self.identifier)
-            .query_async(connection)
-            .await?;
+        let mut position = connection.rpush(&self.queue_key, &self.identifier).await?;
         debug!("Entered queue in position {}", position);
 
         loop {
@@ -116,10 +113,12 @@ impl SharedState {
             tokio::time::sleep(sleep_duration).await;
 
             // Then retrieve the position again
-            position = match redis::cmd("LPOS")
-                .arg(&self.queue_key)
-                .arg(&self.identifier)
-                .query_async::<Connection, Option<u32>>(connection)
+            position = match connection
+                .lpos::<&Vec<u8>, &Vec<u8>, Option<u32>>(
+                    &self.queue_key,
+                    &self.identifier,
+                    LposOptions::default(),
+                )
                 .await?
             {
                 Some(position) => position + 1,
@@ -135,16 +134,10 @@ impl SharedState {
 
     async fn clean_up(self, connection: &mut Connection) -> Result<(), SemaphoreError> {
         info!("Leaving queue");
-        redis::cmd("LPOP")
-            .arg(&self.queue_key)
-            .arg(b"1")
-            .query_async(connection)
+        connection
+            .lpop(&self.queue_key, NonZeroUsize::new(1_usize))
             .await?;
-        redis::cmd("EXPIRE")
-            .arg(&self.queue_key)
-            .arg(b"30")
-            .query_async(connection)
-            .await?;
+        connection.expire(&self.queue_key, 30_usize).await?;
         Ok(())
     }
 }
