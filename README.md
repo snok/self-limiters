@@ -1,20 +1,32 @@
-[![codecov](https://codecov.io/gh/sondrelg/timely/branch/main/graph/badge.svg?token=Q4YJPOFC1F)](https://codecov.io/gh/sondrelg/timely)
+<br>
+<p align="center">
+<a href="https://github.com/snok/timely"><img src="docs/tl5.svg" width="250px"></a>
+<br>
+<b>Distributed async rate limiters</b>
+<br><br>
+<a href="https://pypi.org/project/timely/"><img alt="PyPI" src="https://img.shields.io/pypi/v/timely?label=Release&style=flat-square"></a>
+<a href="https://github.com/sondrelg/timely/actions/workflows/publish.yml"><img alt="PyPI" src="https://github.com/sondrelg/timely/actions/workflows/publish.yml/badge.svg"></a>
+<a href="https://codecov.io/gh/sondrelg/timely/"><img alt="PyPI" src="https://codecov.io/gh/sondrelg/timely/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+</p>
 
-# Timely
+
+
+<br>
 
 > This is currently a work in progress.
 
-Timely provides two types of rate limiters, as a way to police your own processes.
+Traffic lights is a library for client rate limiting. More specifically, it's a project for rate limiting your
+Python applications if you're running an async stack and redis.
 
-Rate-limited APIs often enforce the rate limits by penalizing excessive use.
-It's generally in everyone's interest that this doesn't happen.
+The scope of the library is pretty small. All it does is provide a way to police traffic for:
 
-This package contains one implementation for concurrency-based time limits
-([semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming))),
-and one implementation for time-based rate limits
-([token bucket](https://en.wikipedia.org/wiki/Token_bucket)).
+- Concurrency based limits, using a distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)) (e.g., `n` allowed requests at once)
+- Time based limits, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (e.g., `n` allowed requests per minute)
 
-Both implementations are async, FIFO, and queues are distributed using [Redis](https://redis.io).
+Parts of the logic are implemented using Lua scripts, run _on_ the redis instance.
+This makes it possible to do the same work in one request, that would otherwise take 4. This eliminates the latency
+of each request we've saved, while letting us free up the event-loop to do other things for the duration.
+The overhead if both rate limiters should in other words be completely negligible :rocket:
 
 ## Installation
 
