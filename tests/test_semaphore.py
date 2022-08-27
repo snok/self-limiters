@@ -30,7 +30,7 @@ async def run(pt: partial, duration: float) -> None:
 
 async def test_semaphore_runtimes():
     n = 3
-    sleep = 0.2
+    sleep = 2
 
     # Ensure n tasks never completed in less the time it would take for n nodes to finish sleeping
     with pytest.raises(TimeoutError):
