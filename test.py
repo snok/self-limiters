@@ -23,7 +23,7 @@ async def _consume(name):
         redis_url='redis://127.0.0.1:6389',
         sleep_duration=0.1,
     ):
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
 
 
 async def main():
