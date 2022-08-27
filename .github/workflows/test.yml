@@ -61,6 +61,7 @@ jobs:
           profile: minimal
           toolchain: stable
           components: rustfmt, clippy
+        if: steps.cache-venv-and-cargo.outputs.cache-hit != 'true'
 
       - name: Run cargo check
         uses: actions-rs/cargo@v1
