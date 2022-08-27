@@ -1,8 +1,8 @@
+use crate::semaphore::errors::{MaxPositionExceededError, RedisError};
+use crate::semaphore::Semaphore;
 use pyo3::prelude::*;
 
 mod semaphore;
-
-use crate::semaphore::{MaxPositionExceededError, RedisError, RedisSemaphore};
 
 #[pymodule]
 fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
@@ -14,6 +14,6 @@ fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     )?;
     m.add("RedisError", py.get_type::<RedisError>())?;
     // Add semaphore context manager
-    m.add_class::<RedisSemaphore>()?;
+    m.add_class::<Semaphore>()?;
     Ok(())
 }
