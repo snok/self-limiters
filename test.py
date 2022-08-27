@@ -12,11 +12,11 @@ logging.basicConfig(level='INFO', format=log_format)
 # Build and install
 import_hook.install(bindings='pyo3')
 
-from timely import RedisSemaphore  # noqa
+from timely import Semaphore  # noqa
 
 
 async def _consume(name):
-    async with RedisSemaphore(
+    async with Semaphore(
         name=name,
         capacity=1,
         max_position=100,

@@ -1,63 +1,26 @@
 extern crate redis;
 
 use std::num::NonZeroUsize;
-use std::time::Duration;
 
-use crossbeam_channel::{bounded, Receiver};
+use crate::semaphore::errors::SemaphoreError;
 use log::{debug, info};
 use nanoid::nanoid;
-use pyo3::create_exception;
-use pyo3::exceptions::{PyException, PyRuntimeError};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
 use redis::aio::Connection;
-use redis::{parse_redis_url, AsyncCommands, Client, LposOptions, RedisError as RedisLibError};
+use redis::{parse_redis_url, AsyncCommands, Client, LposOptions};
 
-// Calculates appropriate sleep duration for a given node
-// Sleeps longer when nodes are further back in the queue.
-// We want to sleep for as long as possible, to minimise overall i/o.
-async fn estimate_appropriate_sleep_duration(
-    position: &u32,
-    capacity: &u32,
-    duration: &f32,
-) -> Duration {
-    Duration::from_millis(((position - capacity) as f32 * duration) as u64)
-}
+pub(crate) mod errors;
+pub(crate) mod utils;
 
-// Exception to raise when max position is exceeded
-create_exception!(timely, MaxPositionExceededError, PyException);
-
-// Exception to return in place of redis::RedisError
-// PyErr instances are raised as Python exceptions by pyo3, while
-// native rust errors result in panicself.
-create_exception!(timely, RedisError, PyException);
-
-enum SemaphoreError {
-    MaxPositionExceeded(String),
-    Redis(String),
-    ChannelError(String),
-}
-
-// Map relevant error types to appropriate Python exceptions
-impl From<SemaphoreError> for PyErr {
-    fn from(e: SemaphoreError) -> PyErr {
-        match e {
-            SemaphoreError::MaxPositionExceeded(e) => MaxPositionExceededError::new_err(e),
-            SemaphoreError::Redis(e) => RedisError::new_err(e),
-            SemaphoreError::ChannelError(e) => PyRuntimeError::new_err(e),
-        }
-    }
-}
-
-impl From<RedisLibError> for SemaphoreError {
-    fn from(e: RedisLibError) -> Self {
-        SemaphoreError::Redis(e.to_string())
-    }
-}
+use crate::semaphore::utils::{
+    estimate_appropriate_sleep_duration, open_client_connection, receive_shared_state,
+    send_shared_state,
+};
 
 // Struct for the data we need to pass to our async thread
-struct SharedState {
+pub struct SharedState {
     queue_key: Vec<u8>,
     capacity: u32,
     client: Client,
@@ -67,7 +30,7 @@ struct SharedState {
 }
 
 impl SharedState {
-    fn from(slf: &PyRef<RedisSemaphore>) -> SharedState {
+    fn from(slf: &PyRef<Semaphore>) -> SharedState {
         SharedState {
             queue_key: slf.queue_key.clone(),
             capacity: slf.capacity,
@@ -142,41 +105,8 @@ impl SharedState {
     }
 }
 
-// Open a channel and send some data
-fn send_shared_state(slf: &PyRef<RedisSemaphore>) -> Result<Receiver<SharedState>, SemaphoreError> {
-    let (sender, receiver) = bounded(1);
-    match sender.send(SharedState::from(slf)) {
-        Ok(_) => Ok(receiver),
-        Err(e) => Err(SemaphoreError::ChannelError(format!(
-            "Error sending shared state: {}",
-            e
-        ))),
-    }
-}
-
-// Read data from channel
-fn receive_shared_state(receiver: Receiver<SharedState>) -> Result<SharedState, SemaphoreError> {
-    match receiver.recv() {
-        Ok(s) => Ok(s),
-        Err(e) => Err(SemaphoreError::ChannelError(format!(
-            "Error receiving shared state: {}",
-            e
-        ))),
-    }
-}
-
-async fn open_client_connection(client: &Client) -> Result<Connection, SemaphoreError> {
-    match client.get_async_connection().await {
-        Ok(connection) => Ok(connection),
-        Err(e) => Err(SemaphoreError::Redis(format!(
-            "Failed to connect to redis: {}",
-            e
-        ))),
-    }
-}
-
 #[pyclass()]
-pub(crate) struct RedisSemaphore {
+pub struct Semaphore {
     capacity: u32,
     max_position: u32,
     sleep_duration: f32,
@@ -186,7 +116,7 @@ pub(crate) struct RedisSemaphore {
 }
 
 #[pymethods]
-impl RedisSemaphore {
+impl Semaphore {
     #[new]
     fn new(
         name: &str,
@@ -194,21 +124,21 @@ impl RedisSemaphore {
         redis_url: Option<&str>,
         sleep_duration: Option<f32>,
         max_position: Option<u32>,
-    ) -> PyResult<RedisSemaphore> {
+    ) -> PyResult<Semaphore> {
         debug!("Creating new Semaphore instance");
         let url = match parse_redis_url(redis_url.unwrap_or("redis://127.0.0.1:6379")) {
             Some(url) => url,
             None => {
                 return Err(PyErr::from(SemaphoreError::Redis(String::from(
                     "Failed to parse redis url",
-                ))))
+                ))));
             }
         };
 
         let client = Client::open(url).expect("Failed to connect to Redis");
         let queue_key = format!("__timely-{}-queue", name).as_bytes().to_vec();
 
-        Ok(RedisSemaphore {
+        Ok(Semaphore {
             queue_key,
             capacity,
             client,

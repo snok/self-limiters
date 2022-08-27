@@ -13,7 +13,7 @@ from typing import Any, Optional
 #         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
 #     ) -> None: ...
 
-class RedisSemaphore:
+class Semaphore:
     def __init__(
         self,
         name: str,
