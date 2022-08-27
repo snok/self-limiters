@@ -15,6 +15,7 @@ create_exception!(timely, MaxPositionExceededError, PyException);
 // native rust errors result in panics.
 create_exception!(timely, RedisError, PyException);
 
+/// Enum containing all handled errors.
 #[derive(Debug)]
 pub(crate) enum SemaphoreError {
     MaxPositionExceeded(String),

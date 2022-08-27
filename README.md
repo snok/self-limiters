@@ -11,14 +11,7 @@ The package contains an implementation for concurrency-based time limits
 and an implementation for time-based rate limits
 ([token bucket](https://en.wikipedia.org/wiki/Token_bucket)).
 
-Both implementations are:
-
-- Async
-- Distributed
-- Fair (FIFO)
-- Performant
-
-The package is written in Rust for improved parallelism.
+Both implementations are written are asynchronous and distributed. The package is written in Rust for improved parallelism.
 
 ## Installation
 
@@ -31,6 +24,10 @@ pip install timely
 The semaphore implementation limits concurrent operations.
 It's useful when you, for example, need to make sure that you're
 at most sending `n` requests to a third-party API at the same time.
+
+In terms of fairness, the semaphore implementation skews towards
+FIFO, but is opportunistic. If a new node enters the queue when the
+semaphore is below capacity, we immediately return.
 
 The flow goes roughly like this:
 

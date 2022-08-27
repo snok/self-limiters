@@ -7,7 +7,7 @@ from uuid import uuid4
 from maturin import import_hook
 
 log_format = '[%(asctime)s] [%(levelname)s] - %(message)s'
-logging.basicConfig(level='INFO', format=log_format)
+logging.basicConfig(level='DEBUG', format=log_format)
 
 # Build and install
 import_hook.install(bindings='pyo3')
@@ -23,12 +23,12 @@ async def _consume(name):
         redis_url='redis://127.0.0.1:6389',
         sleep_duration=0.1,
     ):
-        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.5)
 
 
 async def main():
     name = uuid4().hex[:6]
-    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(10)])
+    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(4)])
 
 
 start = datetime.now()
