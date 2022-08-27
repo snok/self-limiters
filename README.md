@@ -2,17 +2,19 @@
 
 > This is currently a work in progress.
 
-Timely provides a way to rate-limit your Python code.
+Timely provides a way to rate-limit your Python processes. The
+rate-limits are stored in Redis, which makes it a good fit when you're
+looking to enforce limits across multiple processes.
 
 The package contains an implementation for concurrency-based time limits
 ([semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming))),
 and an implementation for time-based rate limits
 ([token bucket](https://en.wikipedia.org/wiki/Token_bucket)).
 
-Both rate-limiters are:
+Both implementations are:
 
 - Async
-- Distributed (using Redis)
+- Distributed
 - Fair (FIFO)
 - Performant
 
@@ -26,28 +28,55 @@ pip install timely
 
 ## The semaphore implementation
 
-The semaphore implementation is a concurrency based rate limiter.
-It's useful, e.g., to make sure there only `n`active requests to a
-restricted resource at the same time.
+The semaphore implementation limits concurrent operations.
+It's useful when you, for example, need to make sure that you're
+at most sending `n` requests to a third-party API at the same time.
 
 The flow goes roughly like this:
 
-<img width=800 heigh=800 src="docs/semaphore_aenter.png"></img>
+<img width=800 heigh=800 src="docs/semaphore.png"></img>
 
-<img width=800 heigh=800 src="docs/semaphore_aexit.png"></img>
+<details>
+<summary><b>Flow breakdown</b></summary>
+<ol>
+<li>Enter queue with <a href="https://redis.io/commands/rpush/">RPUSH</a> which returns the position of the node. 
+When using RPUSH, <a href="https://redis.io/commands/lpos/">LPOS</a> will find the first index at O(1), 
+and the second at O(2), and so on. By using this combination, we're prioritizing quicker access at lower indexes.
+</li>
+<li>
+How long to sleep for depends on our position in the queue. If we're position number 10 million, we can sleep for
+longer than if we're the next one up. Sleep duration is 100ms times the number of nodes ahead in the queue by
+default, but the duration is configurable.
+</li>
+<li>
+Check position with <a href="https://redis.io/commands/lpos/">LPOS</a> and raise an error if the position exceeds 
+the maximum allowed position, which is none by default.
+</li>
+<li>
+When the client has finished and aexit is called, we need to clean up the queue entry we added. We could use a
+distributed lock to check our position and pop the right index, but that seems needlessly inefficient. Instead, we 
+just pop the first index, since this will free up capacity in the semaphore for the next process.
+<br><br>
+We also have an unsolved issue of capacity never being freed if a process crashes before running aexit. By adding 
+a queue expiry we give ourselves a chance to reset the queue after a period of inactivity.
+<br><br>
+We run these calls in parallel.
+</li>
+</ol>
+</details>
 
-It is implemented as a context manager in Python and can be used as follows:
+It is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
 
 ```python
-from timely import RedisSemaphore
+from timely import Semaphore
 
-async with RedisSemaphore(
-    name="my-api-queue",  # unique name for the resource we're limiting
-    capacity=10,  # 10 concurrent requests are allowed
-    redis_url="redis://localhost:6379"
+
+async with Semaphore(
+        name="unique-resource-name",
+        capacity=10,
+        redis_url="redis://localhost:6379"
 ):
-    # Perform the rate-limited work immediately
-    ...
+    client.get(...)
 ```
 
 ## The token bucket implementation
