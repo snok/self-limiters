@@ -45,15 +45,21 @@ jobs:
         with:
           python-version: "${{ matrix.python-version }}"
       - uses: actions/cache@v3
-        id: cache-venv
+        id: cache-venv-and-cargo
         with:
-          path: .venv
-          key: ${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}-0
+          path: |
+            .venv
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
       - run: |
           python -m venv .venv --upgrade-deps
           source .venv/bin/activate
           pip install -r dev-requirements.txt
-        if: steps.cache-venv.outputs.cache-hit != 'true'
+        if: steps.cache-venv-and-cargo.outputs.cache-hit != 'true'
       - name: Run tests
         run: |
           source .venv/bin/activate
