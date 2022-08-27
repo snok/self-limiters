@@ -20,8 +20,8 @@ use crate::semaphore::utils::{
     send_shared_state, SemResult,
 };
 
-// Pure rust DTO for the data we need to pass to our thread
-// We could pass the Semaphore itself, but this seemed simpler
+/// Pure rust DTO for the data we need to pass to our thread
+/// We could pass the Semaphore itself, but this seemed simpler.
 pub(crate) struct ThreadState {
     queue_key: Vec<u8>,
     capacity: u32,
@@ -43,6 +43,7 @@ impl ThreadState {
         }
     }
 
+    /// Enter queue and return when the Semaphore has capacity.
     async fn wait_for_slot(self) -> SemResult<()> {
         // Open redis connection
         let mut connection = open_client_connection(&self.client).await?;
@@ -93,6 +94,8 @@ impl ThreadState {
         Ok(())
     }
 
+    /// Pop from the queue, to add capacity back to the
+    /// semaphore, and refresh expiry for the queue.
     async fn clean_up(self) -> SemResult<()> {
         struct S {
             client: Client,
@@ -150,6 +153,7 @@ pub struct Semaphore {
 
 #[pymethods]
 impl Semaphore {
+    /// Create a new class instance.
     #[new]
     fn new(
         name: &str,
@@ -196,6 +200,9 @@ impl Semaphore {
         })
     }
 
+    /// Create a string representation of the class. Without
+    /// this, the class is printed as builtin.Semaphore, which
+    /// is pretty confusing.
     fn __repr__(&self) -> String {
         format!(
             "Semaphore instance {} for queue {}",
