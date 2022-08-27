@@ -57,6 +57,7 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
+          maturin develop
           coverage run -m pytest tests
           coverage xml
           coverage report
