@@ -56,18 +56,6 @@ jobs:
             target/
           key: ${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: rustfmt, clippy
-        if: steps.cache-venv-and-cargo.outputs.cache-hit != 'true'
-
-      - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-
       - run: |
           python -m venv .venv --upgrade-deps
           source .venv/bin/activate
