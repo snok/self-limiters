@@ -17,7 +17,7 @@ pub(crate) mod utils;
 
 use crate::semaphore::utils::{
     estimate_appropriate_sleep_duration, open_client_connection, receive_shared_state,
-    send_shared_state,
+    send_shared_state, SemResult,
 };
 
 // Pure rust DTO for the data we need to pass to our thread
@@ -43,7 +43,7 @@ impl ThreadState {
         }
     }
 
-    async fn wait_for_slot(self) -> Result<(), SemaphoreError> {
+    async fn wait_for_slot(self) -> SemResult<()> {
         // Open redis connection
         let mut connection = open_client_connection(&self.client).await?;
 
@@ -93,7 +93,7 @@ impl ThreadState {
         Ok(())
     }
 
-    async fn clean_up(self) -> Result<(), SemaphoreError> {
+    async fn clean_up(self) -> SemResult<()> {
         struct S {
             client: Client,
             queue_key: Vec<u8>,
@@ -113,14 +113,14 @@ impl ThreadState {
         })
         .unwrap();
 
-        let task1: JoinHandle<Result<(), SemaphoreError>> = tokio::task::spawn(async move {
+        let task1: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
             let slf = r1.recv()?;
             let mut con = open_client_connection(&slf.client).await?;
             con.expire(&slf.queue_key, 30_usize).await?;
             Ok(())
         });
 
-        let task2: JoinHandle<Result<(), SemaphoreError>> = tokio::task::spawn(async move {
+        let task2: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
             let slf = r2.recv()?;
             let mut con = open_client_connection(&slf.client).await?;
             con.lpop(&slf.queue_key, NonZeroUsize::new(1_usize)).await?;
