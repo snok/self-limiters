@@ -4,7 +4,7 @@ use crossbeam_channel::bounded;
 use std::num::NonZeroUsize;
 
 use crate::semaphore::errors::SemaphoreError;
-use log::{debug, info};
+use log::debug;
 use nanoid::nanoid;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -39,7 +39,7 @@ impl ThreadState {
             max_position: slf.max_position,
             sleep_duration: slf.sleep_duration,
             client: slf.client.clone(),
-            identifier: slf._id.clone(),
+            identifier: slf.id.clone(),
         }
     }
 
@@ -53,7 +53,7 @@ impl ThreadState {
 
         loop {
             // If our position is within the Semaphore's capacity, return
-            if position <= self.capacity {
+            if position < self.capacity {
                 debug!("Position is less than capacity. Returning.");
                 break;
             }
@@ -94,7 +94,6 @@ impl ThreadState {
     }
 
     async fn clean_up(self) -> Result<(), SemaphoreError> {
-        info!("Leaving queue");
         struct S {
             client: Client,
             queue_key: Vec<u8>,
@@ -134,14 +133,19 @@ impl ThreadState {
     }
 }
 
-#[pyclass()]
-pub(crate) struct Semaphore {
+#[pyclass(name = "Semaphore", dict)]
+pub struct Semaphore {
+    #[pyo3(get, set)]
     capacity: u32,
+    #[pyo3(get, set)]
     max_position: u32,
+    #[pyo3(get, set)]
     sleep_duration: f32,
-    client: Client,
+    #[pyo3(get, set)]
     queue_key: Vec<u8>,
-    _id: Vec<u8>,
+    #[pyo3(get, set)]
+    id: Vec<u8>,
+    client: Client,
 }
 
 #[pymethods]
@@ -153,8 +157,7 @@ impl Semaphore {
         redis_url: Option<&str>,
         sleep_duration: Option<f32>,
         max_position: Option<u32>,
-    ) -> PyResult<Semaphore> {
-        debug!("Creating new Semaphore instance");
+    ) -> PyResult<Self> {
         let url = match parse_redis_url(redis_url.unwrap_or("redis://127.0.0.1:6379")) {
             Some(url) => url,
             None => {
@@ -163,17 +166,15 @@ impl Semaphore {
                 ))));
             }
         };
-
         let client = Client::open(url).expect("Failed to connect to Redis");
         let queue_key = format!("__timely-{}-queue", name).as_bytes().to_vec();
-
-        Ok(Semaphore {
+        Ok(Self {
             queue_key,
             capacity,
             client,
             sleep_duration: sleep_duration.unwrap_or(0.1),
             max_position: max_position.unwrap_or(0),
-            _id: nanoid!(10).into_bytes(),
+            id: nanoid!(10).into_bytes(),
         })
     }
 
@@ -193,5 +194,13 @@ impl Semaphore {
             shared_state.clean_up().await?;
             Ok(())
         })
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "Semaphore instance {} for queue {}",
+            String::from_utf8_lossy(&self.id),
+            String::from_utf8_lossy(&self.queue_key)
+        )
     }
 }

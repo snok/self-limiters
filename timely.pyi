@@ -18,13 +18,13 @@ class Semaphore:
         self,
         name: str,
         capacity: int,
-        redis_url: str,
-        sleep_duration: Optional[float] = None,
-        max_position: Optional[int] = None,
+        redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
+        sleep_duration: Optional[float] = None,  # will be set as 0.1 if None
+        max_position: Optional[int] = None,  # will be set as 0 if None
     ) -> None: ...
 
-    queue_key: str
-    client: Any
-    identifier: str
+    capacity: int
+    id: bytes
+    queue_key: bytes
     sleep_duration: float
     max_position: int
