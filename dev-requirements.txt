@@ -4,3 +4,5 @@ pytest-asyncio
 pre-commit
 coverage
 maturin
+uvloop
+coverage
