@@ -1,7 +1,7 @@
 extern crate redis;
 
-use crossbeam_channel::bounded;
 use std::num::NonZeroUsize;
+use std::sync::mpsc::channel;
 
 use crate::semaphore::errors::SemaphoreError;
 use log::debug;
@@ -102,14 +102,14 @@ impl ThreadState {
             queue_key: Vec<u8>,
         }
 
-        let (s1, r1) = bounded(1);
+        let (s1, r1) = channel();
         s1.send(S {
             client: self.client.to_owned(),
             queue_key: self.queue_key.to_owned(),
         })
         .unwrap();
 
-        let (s2, r2) = bounded(1);
+        let (s2, r2) = channel();
         s2.send(S {
             client: self.client.to_owned(),
             queue_key: self.queue_key.to_owned(),

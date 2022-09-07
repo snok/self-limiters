@@ -1,6 +1,6 @@
+use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
 
-use crossbeam_channel::{bounded, Receiver};
 use redis::aio::Connection;
 use redis::Client;
 
@@ -22,7 +22,7 @@ pub(crate) fn estimate_appropriate_sleep_duration(
 
 /// Open a channel and send some data
 pub(crate) fn send_shared_state(ts: ThreadState) -> SemResult<Receiver<ThreadState>> {
-    let (sender, receiver) = bounded(1);
+    let (sender, receiver) = channel();
     sender.send(ts)?;
     Ok(receiver)
 }
