@@ -268,7 +268,7 @@ jobs:
       - pypy
     if: "startsWith(github.ref, 'refs/tags/')"
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v3
         with:
           name: wheels
       - uses: actions/setup-python@v4
