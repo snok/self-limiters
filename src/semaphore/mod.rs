@@ -3,7 +3,6 @@ extern crate redis;
 use std::num::NonZeroUsize;
 use std::sync::mpsc::channel;
 
-use crate::semaphore::errors::SemaphoreError;
 use log::debug;
 use nanoid::nanoid;
 use pyo3::prelude::*;
@@ -12,13 +11,14 @@ use pyo3_asyncio::tokio::future_into_py;
 use redis::{parse_redis_url, AsyncCommands, Client, LposOptions};
 use tokio::task::JoinHandle;
 
-pub(crate) mod errors;
-pub(crate) mod utils;
-
+use crate::semaphore::errors::SemaphoreError;
 use crate::semaphore::utils::{
     estimate_appropriate_sleep_duration, open_client_connection, receive_shared_state,
     send_shared_state, SemResult,
 };
+
+pub(crate) mod errors;
+pub(crate) mod utils;
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
@@ -44,12 +44,15 @@ impl ThreadState {
     }
 
     /// Enter queue and return when the Semaphore has capacity.
-    async fn wait_for_slot(self) -> SemResult<()> {
+    async fn wait_for_slot(self) -> Result<(), PyErr> {
         // Open redis connection
         let mut connection = open_client_connection(&self.client).await?;
 
         // Enter queue and get the current position
-        let mut position = connection.rpush(&self.queue_key, &self.identifier).await?;
+        let mut position = connection
+            .rpush(&self.queue_key, &self.identifier)
+            .await
+            .map_err(|e| PyErr::from(SemaphoreError::from(e)))?;
         debug!("Entered queue in position {}", position);
 
         loop {
@@ -62,10 +65,10 @@ impl ThreadState {
             // If the position exceeds the maximum tolerated position, throw an error
             if self.max_position > 0 && position > self.max_position {
                 debug!("Position is greater than max position. Returning.");
-                return Err(SemaphoreError::MaxPositionExceeded(format!(
+                return Err(PyErr::from(SemaphoreError::MaxPositionExceeded(format!(
                     "Position {} exceeds the max position ({}).",
                     position, self.max_position
-                )));
+                ))));
             }
 
             // Otherwise, sleep for a bit and check again
@@ -87,7 +90,8 @@ impl ThreadState {
                     &self.identifier,
                     LposOptions::default(),
                 )
-                .await?
+                .await
+                .map_err(|e| PyErr::from(SemaphoreError::from(e)))?
                 .unwrap_or(1);
             debug!("Position is now {}", position);
         }
@@ -136,17 +140,19 @@ impl ThreadState {
     }
 }
 
-#[pyclass(name = "Semaphore", dict)]
+#[pyclass]
+#[pyo3(name = "Semaphore")]
+#[pyo3(module = "timely")]
 pub struct Semaphore {
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     capacity: u32,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     max_position: u32,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     sleep_duration: f32,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     queue_key: Vec<u8>,
-    #[pyo3(get, set)]
+    #[pyo3(get)]
     id: Vec<u8>,
     client: Client,
 }
@@ -184,16 +190,17 @@ impl Semaphore {
 
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
-        future_into_py(py, async move {
+        future_into_py(py, async {
             let shared_state = receive_shared_state(receiver)?;
-            Ok(shared_state.wait_for_slot().await?)
+            shared_state.wait_for_slot().await?;
+            Ok(())
         })
     }
 
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
-        future_into_py(py, async move {
+        future_into_py(py, async {
             let shared_state = receive_shared_state(receiver)?;
             shared_state.clean_up().await?;
             Ok(())
