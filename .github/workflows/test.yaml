@@ -1,0 +1,137 @@
+name: test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  cargo_build:
+    name: "cargo build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/cache@v3
+        env:
+          cache-name: cache-cargo
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - run: cargo build --release
+
+  cargo_test:
+    name: "cargo test"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/cache@v3
+        env:
+          cache-name: cache-cargo
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - run: cargo test
+
+  maturin_build:
+    name: "maturin build"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - run: pip install maturin
+      - uses: actions/cache@v3
+        env:
+          cache-name: cache-cargo
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      - run: maturin build -b bin
+
+  pre_commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - run: pip install pre-commit
+      - uses: actions/cache@v3
+        id: pre-commit-cache
+        with:
+          path: ~/.cache/pre-commit
+          key: key-0
+      - run: pre-commit run --all-files
+
+  python_test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.10.6" ]
+    services:
+      redis:
+        image: redis:6.2.5-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - '127.0.0.1:6389:6379'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "${{ matrix.python-version }}"
+      - uses: actions/cache@v3
+        id: cache-venv-and-cargo
+        with:
+          path: |
+            .venv
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
+      - run: |
+          python -m venv .venv --upgrade-deps
+          source .venv/bin/activate
+          pip install -r dev-requirements.txt
+        if: steps.cache-venv-and-cargo.outputs.cache-hit != 'true'
+      - name: Run tests
+        run: |
+          source .venv/bin/activate
+          maturin develop
+          coverage run -m pytest tests
+          coverage xml
+          coverage report

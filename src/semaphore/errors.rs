@@ -1,10 +1,10 @@
 use crate::semaphore::ThreadState;
-use crossbeam_channel::{RecvError, SendError};
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
+use std::sync::mpsc::{RecvError, SendError};
 use tokio::task::JoinError;
 
 // Exception to raise when max position is exceeded

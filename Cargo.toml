@@ -12,8 +12,7 @@ pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
 pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
 tokio = "^1.20.1"
 redis = { version="^0.21.5", features = ["aio", "tokio-comp"] }
-redlock = "^1.2.0"
+redlock = { version="1.2.0", features = ["tokio", "async"] }
 log = "0.4.17"
 pyo3-log = "^0.6.0"
 nanoid = "^0.4.0"
-crossbeam-channel = "^0.5.1"

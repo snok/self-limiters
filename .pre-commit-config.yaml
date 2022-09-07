@@ -4,6 +4,7 @@ repos:
     hooks:
       - id: fmt
       - id: cargo-check
+      - id: clippy
 
   - repo: https://github.com/psf/black
     rev: 22.6.0
