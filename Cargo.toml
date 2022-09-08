@@ -7,7 +7,11 @@ edition = "2021"
 name = "timely"
 crate-type = ["cdylib"]
 
+[features]
+unstable = ["clippy"]
+
 [dependencies]
+clippy = { version = "*", optional = true }
 pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
 pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
 tokio = "^1.20.1"

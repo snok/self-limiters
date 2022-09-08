@@ -74,7 +74,7 @@ impl TokenBucket {
     /// Create a new class instance.
     #[new]
     fn new(
-        name: &str,
+        name: String,
         capacity: u32,
         refill_frequency: f32,
         refill_amount: u32,
@@ -101,7 +101,7 @@ impl TokenBucket {
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
             id,
-            name: name.to_string(),
+            name,
             data_key,
             queue_key,
         })

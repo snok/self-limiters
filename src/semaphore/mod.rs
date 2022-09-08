@@ -162,7 +162,7 @@ impl Semaphore {
     /// Create a new class instance.
     #[new]
     fn new(
-        name: &str,
+        name: String,
         capacity: u32,
         redis_url: Option<&str>,
         sleep_duration: Option<f32>,

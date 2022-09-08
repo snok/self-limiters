@@ -138,7 +138,7 @@ mod tests {
 
         for _ in 0..100 {
             assert_eq!(&data.tokens_left_for_slot, &1);
-            assert!(&now == &data.slot);
+            assert_eq!(now, data.slot);
 
             data.tokens_left_for_slot -= 1;
             data = data.update_bucket(0.05, 1, 1);

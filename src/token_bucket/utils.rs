@@ -142,10 +142,10 @@ mod tests2 {
         let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
         let mut connection = open_client_connection(&client).await?;
         let mut scheduled = was_scheduled("test", &mut connection).await?;
-        assert_eq!(scheduled, false);
+        assert!(scheduled, "false");
         set_scheduled("test", &mut connection).await?;
         scheduled = was_scheduled("test", &mut connection).await?;
-        assert_eq!(scheduled, true);
+        assert!(scheduled, "true");
         Ok(())
     }
 
