@@ -122,6 +122,13 @@ jobs:
           - '127.0.0.1:6389:6379'
     steps:
       - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: actions/setup-python@v4
         with:
           python-version: "${{ matrix.python-version }}"
@@ -145,7 +152,4 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
-          maturin develop
-          coverage run -m pytest tests
-          coverage xml
-          coverage report
+          make test
