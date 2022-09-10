@@ -113,6 +113,7 @@ impl TokenBucket {
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
         // Spawn a thread to run scheduling
         let r1 = send_shared_state(&slf)?;
+
         py.allow_threads(move || {
             thread::spawn(move || {
                 tokio::runtime::Builder::new_current_thread()

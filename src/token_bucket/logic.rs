@@ -1,18 +1,18 @@
-use crate::token_bucket::data::{Data, MIN_BUFFER};
+use std::num::NonZeroUsize;
+use std::time::Duration;
 
+use log::{debug, info};
+use pyo3::PyErr;
+use redis::{AsyncCommands, LposOptions};
+use redlock::{Lock, RedLock};
+
+use crate::token_bucket::data::{Data, MIN_BUFFER};
+use crate::token_bucket::error::TokenBucketError;
 use crate::token_bucket::utils::{
     create_node_key, minimum_time_until_slot, nodes_to_fetch, now_millis, open_client_connection,
     set_scheduled, sleep_for, was_scheduled, TBResult,
 };
 use crate::token_bucket::ThreadState;
-use log::{debug, info};
-use pyo3::PyErr;
-
-use crate::token_bucket::error::TokenBucketError;
-use redis::{AsyncCommands, LposOptions};
-use redlock::{Lock, RedLock};
-use std::num::NonZeroUsize;
-use std::time::Duration;
 
 async fn sleep_based_on_position(position: &i64, ts: &ThreadState) -> TBResult<()> {
     let sleep_duration = Duration::from_millis(minimum_time_until_slot(

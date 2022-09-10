@@ -6,6 +6,7 @@ from functools import partial
 from uuid import uuid4
 
 import pytest
+
 from timely import TokenBucket
 
 from .conftest import run

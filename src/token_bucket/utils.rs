@@ -128,35 +128,3 @@ pub(crate) fn now_millis() -> u64 {
         .unwrap()
         .as_millis() as u64
 }
-
-#[cfg(test)]
-mod tests2 {
-    use redis::Client;
-
-    use crate::token_bucket::utils::{
-        minimum_time_until_slot, open_client_connection, set_scheduled, was_scheduled, TBResult,
-    };
-
-    #[tokio::test]
-    async fn test_scheduling() -> TBResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
-        let mut connection = open_client_connection(&client).await?;
-        let mut scheduled = was_scheduled("test", &mut connection).await?;
-        assert!(scheduled, "false");
-        set_scheduled("test", &mut connection).await?;
-        scheduled = was_scheduled("test", &mut connection).await?;
-        assert!(scheduled, "true");
-        Ok(())
-    }
-
-    #[test]
-    fn minimum_time_until_slot_works() {
-        assert_eq!(minimum_time_until_slot(&0, &3, &1.0, &3), 0.0);
-        assert_eq!(minimum_time_until_slot(&1, &3, &1.0, &3), 0.0);
-        assert_eq!(minimum_time_until_slot(&2, &3, &1.0, &3), 0.0);
-        assert_eq!(minimum_time_until_slot(&3, &3, &1.0, &3), 1.0);
-        assert_eq!(minimum_time_until_slot(&4, &3, &1.0, &3), 1.0);
-        assert_eq!(minimum_time_until_slot(&5, &3, &1.0, &3), 1.0);
-        assert_eq!(minimum_time_until_slot(&100, &3, &1.0, &3), 33.0);
-    }
-}
