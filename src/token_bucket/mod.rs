@@ -21,15 +21,15 @@ pub(crate) mod utils;
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
 pub struct ThreadState {
-    client: Client,
-    name: String,
-    queue_key: String,
-    data_key: String,
-    id: String,
-    capacity: u32,
-    max_sleep: Duration,
-    frequency: f32,
-    amount: u32,
+    pub(crate) client: Client,
+    pub(crate) name: String,
+    pub(crate) queue_key: String,
+    pub(crate) data_key: String,
+    pub(crate) id: String,
+    pub(crate) capacity: u32,
+    pub(crate) max_sleep: Duration,
+    pub(crate) frequency: f32,
+    pub(crate) amount: u32,
 }
 
 impl ThreadState {

@@ -36,14 +36,20 @@ fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::semaphore::errors::SemaphoreError;
+    use crate::semaphore::ThreadState as SemaphoreThreadState;
     use crate::token_bucket::error::TokenBucketError;
-    use crate::utils::open_client_connection;
+    use crate::token_bucket::ThreadState as TokenBucketThreadState;
+    use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
     use redis::Client;
+    use std::thread;
+    use std::time::Duration;
 
     use super::token_bucket::data::Data;
     use super::token_bucket::utils::{
         minimum_time_until_slot, now_millis, set_scheduled, was_scheduled, TBResult,
     };
+    use crate::semaphore::utils::SemResult;
 
     #[tokio::test]
     async fn test_scheduling() -> TBResult<()> {
@@ -104,6 +110,80 @@ mod tests {
             data = data.update_bucket(0.05, 1, 1);
             now += 50;
         }
+        Ok(())
+    }
+
+    #[test]
+    fn send_and_receive_via_channel_semaphore_threaded() -> SemResult<()> {
+        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let queue_key = String::from("test");
+        let id = String::from("test");
+        let capacity = 1;
+        let max_position = 10;
+        let sleep_duration = 0.1;
+
+        // Send and receive w/o thread
+        let receiver =
+            send_shared_state::<SemaphoreThreadState, SemaphoreError>(SemaphoreThreadState {
+                client: client.to_owned(),
+                queue_key: queue_key.to_owned(),
+                id: id.to_owned(),
+                capacity: capacity.to_owned(),
+                max_position: max_position.to_owned(),
+                sleep_duration: sleep_duration.to_owned(),
+            })
+            .unwrap();
+        let copied_ts = thread::spawn(move || {
+            receive_shared_state::<SemaphoreThreadState, SemaphoreError>(receiver).unwrap()
+        })
+        .join()
+        .unwrap();
+        assert_eq!(copied_ts.queue_key, queue_key);
+        assert_eq!(copied_ts.id, id);
+        assert_eq!(copied_ts.capacity, capacity);
+        assert_eq!(copied_ts.max_position, max_position);
+        assert_eq!(copied_ts.sleep_duration, sleep_duration);
+        Ok(())
+    }
+
+    #[test]
+    fn send_and_receive_via_channel_token_bucket_threaded() -> TBResult<()> {
+        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let queue_key = String::from("test");
+        let data_key = String::from("test");
+        let name = String::from("test");
+        let id = String::from("test");
+        let capacity = 1;
+        let max_sleep = Duration::from_millis(10);
+        let frequency = 0.1;
+        let amount = 1;
+
+        // Send and receive w/o thread
+        let receiver =
+            send_shared_state::<TokenBucketThreadState, TokenBucketError>(TokenBucketThreadState {
+                client: client.to_owned(),
+                queue_key: queue_key.to_owned(),
+                data_key: data_key.to_owned(),
+                name: name.to_owned(),
+                id: id.to_owned(),
+                capacity: capacity.to_owned(),
+                max_sleep: max_sleep.to_owned(),
+                frequency: frequency.to_owned(),
+                amount: amount.to_owned(),
+            })
+            .unwrap();
+        thread::spawn(move || {
+            let copied_ts =
+                receive_shared_state::<TokenBucketThreadState, TokenBucketError>(receiver).unwrap();
+            assert_eq!(copied_ts.queue_key, queue_key);
+            assert_eq!(copied_ts.data_key, data_key);
+            assert_eq!(copied_ts.name, name);
+            assert_eq!(copied_ts.id, id);
+            assert_eq!(copied_ts.capacity, capacity);
+            assert_eq!(copied_ts.max_sleep, max_sleep);
+            assert_eq!(copied_ts.frequency, frequency);
+            assert_eq!(copied_ts.amount, amount);
+        });
         Ok(())
     }
 }
