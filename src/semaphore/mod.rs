@@ -17,11 +17,11 @@ pub(crate) mod utils;
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
 pub(crate) struct ThreadState {
-    queue_key: Vec<u8>,
+    queue_key: String,
     capacity: u32,
     max_position: u32,
     sleep_duration: f32,
-    identifier: Vec<u8>,
+    id: String,
     client: Client,
 }
 
@@ -33,7 +33,7 @@ impl ThreadState {
             max_position: slf.max_position,
             sleep_duration: slf.sleep_duration,
             client: slf.client.clone(),
-            identifier: slf.id.clone(),
+            id: slf.id.clone(),
         }
     }
 }
@@ -49,9 +49,9 @@ pub struct Semaphore {
     #[pyo3(get)]
     sleep_duration: f32,
     #[pyo3(get)]
-    queue_key: Vec<u8>,
+    queue_key: String,
     #[pyo3(get)]
-    id: Vec<u8>,
+    id: String,
     client: Client,
 }
 
@@ -75,14 +75,14 @@ impl Semaphore {
             }
         };
         let client = Client::open(url).expect("Failed to connect to Redis");
-        let queue_key = format!("__timely-{}-queue", name).as_bytes().to_vec();
+        let queue_key = format!("__timely-{}-queue", name);
         Ok(Self {
             queue_key,
             capacity,
             client,
             sleep_duration: sleep_duration.unwrap_or(0.1),
             max_position: max_position.unwrap_or(0),
-            id: nanoid!(10).into_bytes(),
+            id: nanoid!(10),
         })
     }
 
@@ -111,8 +111,7 @@ impl Semaphore {
     fn __repr__(&self) -> String {
         format!(
             "Semaphore instance {} for queue {}",
-            String::from_utf8_lossy(&self.id),
-            String::from_utf8_lossy(&self.queue_key)
+            &self.id, &self.queue_key
         )
     }
 }

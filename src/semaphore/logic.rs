@@ -20,7 +20,7 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 
     // Enter queue and get the current position
     let mut position = connection
-        .rpush(&ts.queue_key, &ts.identifier)
+        .rpush(&ts.queue_key, &ts.id)
         .await
         .map_err(|e| PyErr::from(SemaphoreError::from(e)))?;
     debug!("Entered queue in position {}", position);
@@ -52,11 +52,7 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 
         // Retrieve position again
         position = connection
-            .lpos::<&Vec<u8>, &Vec<u8>, Option<u32>>(
-                &ts.queue_key,
-                &ts.identifier,
-                LposOptions::default(),
-            )
+            .lpos::<&String, &String, Option<u32>>(&ts.queue_key, &ts.id, LposOptions::default())
             .await
             .map_err(|e| PyErr::from(SemaphoreError::from(e)))?
             .unwrap_or(1);
@@ -70,7 +66,7 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 pub(crate) async fn clean_up(ts: ThreadState) -> SemResult<()> {
     struct S {
         client: Client,
-        queue_key: Vec<u8>,
+        queue_key: String,
     }
 
     let (s1, r1) = channel();
