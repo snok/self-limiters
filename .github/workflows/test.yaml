@@ -86,7 +86,7 @@ jobs:
             ${{ runner.os }}-build-${{ env.cache-name }}-
             ${{ runner.os }}-build-
             ${{ runner.os }}-
-      - run: maturin build -b bin
+      - run: maturin build -b pyo3
 
   pre_commit:
     runs-on: ubuntu-latest
