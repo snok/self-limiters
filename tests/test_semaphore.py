@@ -22,7 +22,7 @@ def semaphore_factory(**kwargs) -> partial:
     """
 
     defaults = {'name': uuid4().hex[:6], 'capacity': 1, 'redis_url': 'redis://127.0.0.1:6389'}
-    return partial(Semaphore, **(defaults | kwargs))
+    return partial(Semaphore, **{**defaults, **kwargs})
 
 
 async def test_semaphore_runtimes():

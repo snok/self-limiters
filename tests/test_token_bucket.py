@@ -28,7 +28,7 @@ def tokenbucket_factory(**kwargs) -> partial:
         'refill_amount': 1,
         'redis_url': 'redis://127.0.0.1:6389',
     }
-    return partial(TokenBucket, **(defaults | kwargs))
+    return partial(TokenBucket, **{**defaults, **kwargs})
 
 
 async def test_token_bucket_runtimes():
