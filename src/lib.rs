@@ -36,6 +36,7 @@ fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::token_bucket::error::TokenBucketError;
     use crate::utils::open_client_connection;
     use redis::Client;
 
@@ -47,7 +48,7 @@ mod tests {
     #[tokio::test]
     async fn test_scheduling() -> TBResult<()> {
         let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
-        let mut connection = open_client_connection(&client).await?;
+        let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
         let mut scheduled = was_scheduled("test", &mut connection).await?;
         assert_eq!(scheduled, false);
         set_scheduled("test", &mut connection).await?;
@@ -71,7 +72,7 @@ mod tests {
     #[tokio::test]
     async fn test_write_and_read_data() -> TBResult<()> {
         let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
-        let mut connection = open_client_connection(&client).await?;
+        let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
 
         let data = Data::new(&0.5, 1);
 
