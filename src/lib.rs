@@ -2,12 +2,14 @@ use pyo3::prelude::*;
 
 use token_bucket::TokenBucket;
 
-use crate::semaphore::errors::{MaxPositionExceededError, RedisError};
+use crate::errors::RedisError;
+use crate::semaphore::errors::MaxPositionExceededError;
 use crate::semaphore::Semaphore;
 use crate::token_bucket::error::MaxSleepExceededError;
 
 mod semaphore;
 
+mod errors;
 mod token_bucket;
 
 #[pymodule]

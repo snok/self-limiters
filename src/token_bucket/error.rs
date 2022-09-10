@@ -1,3 +1,4 @@
+use crate::errors::RedisError;
 use crate::token_bucket::ThreadState;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
@@ -10,11 +11,6 @@ use tokio::task::JoinError;
 
 // Exception to raise when max sleep time is exceeded
 create_exception!(timely, MaxSleepExceededError, PyException);
-
-// Exception to return in place of redis::RedisError
-// PyErr instances are raised as Python exceptions by pyo3, while
-// native rust errors result in panics.
-create_exception!(timely, RedisError, PyException);
 
 /// Enum containing all handled errors.
 #[derive(Debug)]
