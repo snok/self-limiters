@@ -1,11 +1,9 @@
-use std::sync::mpsc::{channel, Receiver};
 use std::time::Duration;
 
 use redis::aio::Connection;
 use redis::Client;
 
 use crate::semaphore::errors::SemaphoreError;
-use crate::semaphore::ThreadState;
 
 pub(crate) type SemResult<T> = Result<T, SemaphoreError>;
 
@@ -18,18 +16,6 @@ pub(crate) fn estimate_appropriate_sleep_duration(
     duration: &f32,
 ) -> Duration {
     Duration::from_millis(((position - capacity) as f32 * duration) as u64)
-}
-
-/// Open a channel and send some data
-pub(crate) fn send_shared_state(ts: ThreadState) -> SemResult<Receiver<ThreadState>> {
-    let (sender, receiver) = channel();
-    sender.send(ts)?;
-    Ok(receiver)
-}
-
-/// Read data from channel
-pub(crate) fn receive_shared_state(receiver: Receiver<ThreadState>) -> SemResult<ThreadState> {
-    Ok(receiver.recv()?)
 }
 
 /// Open Redis connection

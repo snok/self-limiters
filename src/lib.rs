@@ -6,11 +6,11 @@ use crate::errors::RedisError;
 use crate::semaphore::errors::MaxPositionExceededError;
 use crate::semaphore::Semaphore;
 use crate::token_bucket::error::MaxSleepExceededError;
-
 mod semaphore;
 
 mod errors;
 mod token_bucket;
+mod utils;
 
 #[pymodule]
 fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {

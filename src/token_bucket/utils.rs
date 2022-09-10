@@ -1,9 +1,5 @@
 use crate::token_bucket::error::TokenBucketError;
-use crate::token_bucket::ThreadState;
-use crate::TokenBucket;
-use pyo3::PyRef;
 use redis::aio::Connection;
-use std::sync::mpsc::{channel, Receiver};
 
 use redis::AsyncCommands;
 use redis::Client;
@@ -53,29 +49,6 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TBResul
     }
 
     Ok(())
-}
-
-// Open a channel and send some data
-pub fn send_shared_state(slf: &PyRef<TokenBucket>) -> TBResult<Receiver<ThreadState>> {
-    let (sender, receiver) = channel();
-    match sender.send(ThreadState::from(slf)) {
-        Ok(_) => Ok(receiver),
-        Err(e) => Err(TokenBucketError::ChannelError(format!(
-            "Error sending shared state: {}",
-            e
-        ))),
-    }
-}
-
-// Read data from channel
-pub fn receive_shared_state(receiver: Receiver<ThreadState>) -> TBResult<ThreadState> {
-    match receiver.recv() {
-        Ok(s) => Ok(s),
-        Err(e) => Err(TokenBucketError::ChannelError(format!(
-            "Error receiving shared state: {}",
-            e
-        ))),
-    }
 }
 
 pub async fn open_client_connection(client: &Client) -> TBResult<Connection> {

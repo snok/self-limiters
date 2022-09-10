@@ -9,9 +9,9 @@ use pyo3::{PyAny, PyErr, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{parse_redis_url, Client};
 
+use crate::utils::{receive_shared_state, send_shared_state};
 use error::TokenBucketError;
 use logic::{schedule, wait_for_slot};
-use utils::{receive_shared_state, send_shared_state};
 
 pub(crate) mod data;
 pub(crate) mod error;
@@ -112,7 +112,7 @@ impl TokenBucket {
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
         // Spawn a thread to run scheduling
-        let r1 = send_shared_state(&slf)?;
+        let r1 = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
 
         py.allow_threads(move || {
             thread::spawn(move || {
@@ -121,16 +121,17 @@ impl TokenBucket {
                     .build()
                     .unwrap()
                     .block_on(async {
-                        let shared_state = receive_shared_state(r1).unwrap();
+                        let shared_state =
+                            receive_shared_state::<ThreadState, TokenBucketError>(r1).unwrap();
                         schedule(shared_state).await.unwrap();
                     });
             });
         });
 
         // Return future for the python event loop
-        let r2 = send_shared_state(&slf)?;
+        let r2 = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let shared_state = receive_shared_state(r2).unwrap();
+            let shared_state = receive_shared_state::<ThreadState, TokenBucketError>(r2).unwrap();
             wait_for_slot(shared_state).await?;
             Ok(())
         })

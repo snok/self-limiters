@@ -13,9 +13,9 @@ use tokio::task::JoinHandle;
 
 use crate::semaphore::errors::SemaphoreError;
 use crate::semaphore::utils::{
-    estimate_appropriate_sleep_duration, open_client_connection, receive_shared_state,
-    send_shared_state, SemResult,
+    estimate_appropriate_sleep_duration, open_client_connection, SemResult,
 };
+use crate::utils::{receive_shared_state, send_shared_state};
 
 pub(crate) mod errors;
 pub(crate) mod utils;
@@ -189,9 +189,9 @@ impl Semaphore {
     }
 
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState, SemaphoreError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let shared_state = receive_shared_state(receiver)?;
+            let shared_state = receive_shared_state::<ThreadState, SemaphoreError>(receiver)?;
             shared_state.wait_for_slot().await?;
             Ok(())
         })
@@ -199,9 +199,9 @@ impl Semaphore {
 
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState, SemaphoreError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let shared_state = receive_shared_state(receiver)?;
+            let shared_state = receive_shared_state::<ThreadState, SemaphoreError>(receiver)?;
             shared_state.clean_up().await?;
             Ok(())
         })
