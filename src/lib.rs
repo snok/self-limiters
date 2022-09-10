@@ -36,12 +36,12 @@ fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::open_client_connection;
     use redis::Client;
 
     use super::token_bucket::data::Data;
     use super::token_bucket::utils::{
-        minimum_time_until_slot, now_millis, open_client_connection, set_scheduled, was_scheduled,
-        TBResult,
+        minimum_time_until_slot, now_millis, set_scheduled, was_scheduled, TBResult,
     };
 
     #[tokio::test]

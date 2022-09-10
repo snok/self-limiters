@@ -1,8 +1,7 @@
 use crate::token_bucket::error::TokenBucketError;
-use redis::aio::Connection;
-
 use redis::AsyncCommands;
-use redis::Client;
+
+use redis::aio::Connection;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub(crate) type TBResult<T> = Result<T, TokenBucketError>;
@@ -49,16 +48,6 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TBResul
     }
 
     Ok(())
-}
-
-pub async fn open_client_connection(client: &Client) -> TBResult<Connection> {
-    match client.get_async_connection().await {
-        Ok(connection) => Ok(connection),
-        Err(e) => Err(TokenBucketError::Redis(format!(
-            "Failed to connect to redis: {}",
-            e
-        ))),
-    }
 }
 
 pub(crate) fn create_node_key(name: &str, id: &str) -> Vec<u8> {

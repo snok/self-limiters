@@ -3,16 +3,17 @@ use std::time::Duration;
 
 use log::{debug, info};
 use pyo3::PyErr;
-use redis::{AsyncCommands, LposOptions};
+use redis::{AsyncCommands, Client, LposOptions};
 use redlock::{Lock, RedLock};
 
 use crate::token_bucket::data::{Data, MIN_BUFFER};
 use crate::token_bucket::error::TokenBucketError;
 use crate::token_bucket::utils::{
-    create_node_key, minimum_time_until_slot, nodes_to_fetch, now_millis, open_client_connection,
-    set_scheduled, sleep_for, was_scheduled, TBResult,
+    create_node_key, minimum_time_until_slot, nodes_to_fetch, now_millis, set_scheduled, sleep_for,
+    was_scheduled, TBResult,
 };
 use crate::token_bucket::ThreadState;
+use crate::utils::open_client_connection;
 
 async fn sleep_based_on_position(position: &i64, ts: &ThreadState) -> TBResult<()> {
     let sleep_duration = Duration::from_millis(minimum_time_until_slot(
@@ -26,7 +27,7 @@ async fn sleep_based_on_position(position: &i64, ts: &ThreadState) -> TBResult<(
 
 pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
     // Connect to redis
-    let mut connection = open_client_connection(&ts.client).await?;
+    let mut connection = open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
 
     // Enter queue
     // Note: The position received here is *not* an indication of where we are
@@ -72,7 +73,9 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 
 pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
     // Open redis connection
-    let mut connection = open_client_connection(&ts.client).await.unwrap();
+    let mut connection = open_client_connection::<&Client, TokenBucketError>(&ts.client)
+        .await
+        .unwrap();
 
     // Try to acquire scheduler lock
     let url = format!("redis://{}", ts.client.get_connection_info().addr);

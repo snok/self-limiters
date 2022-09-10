@@ -12,10 +12,8 @@ use redis::{parse_redis_url, AsyncCommands, Client, LposOptions};
 use tokio::task::JoinHandle;
 
 use crate::semaphore::errors::SemaphoreError;
-use crate::semaphore::utils::{
-    estimate_appropriate_sleep_duration, open_client_connection, SemResult,
-};
-use crate::utils::{receive_shared_state, send_shared_state};
+use crate::semaphore::utils::{estimate_appropriate_sleep_duration, SemResult};
+use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
 
 pub(crate) mod errors;
 pub(crate) mod utils;
@@ -46,7 +44,7 @@ impl ThreadState {
     /// Enter queue and return when the Semaphore has capacity.
     async fn wait_for_slot(self) -> Result<(), PyErr> {
         // Open redis connection
-        let mut connection = open_client_connection(&self.client).await?;
+        let mut connection = open_client_connection::<Client, SemaphoreError>(&self.client).await?;
 
         // Enter queue and get the current position
         let mut position = connection
@@ -122,14 +120,14 @@ impl ThreadState {
 
         let task1: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
             let slf = r1.recv()?;
-            let mut con = open_client_connection(&slf.client).await?;
+            let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
             con.expire(&slf.queue_key, 30_usize).await?;
             Ok(())
         });
 
         let task2: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
             let slf = r2.recv()?;
-            let mut con = open_client_connection(&slf.client).await?;
+            let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
             con.lpop(&slf.queue_key, NonZeroUsize::new(1_usize)).await?;
             Ok(())
         });
