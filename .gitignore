@@ -70,3 +70,5 @@ docs/_build/
 
 # Pyenv
 .python-version
+
+ARGO_LLVM_COV_TARGET_DIR
