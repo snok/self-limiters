@@ -16,9 +16,7 @@ create_exception!(timely, MaxSleepExceededError, PyException);
 pub enum TokenBucketError {
     MaxSleepExceeded(String),
     Redis(String),
-    ChannelError(String),
-    ParseIntError(String),
-    JoinError(String),
+    RuntimeError(String),
 }
 
 // Map relevant error types to appropriate Python exceptions
@@ -27,9 +25,7 @@ impl From<TokenBucketError> for PyErr {
         match e {
             TokenBucketError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
             TokenBucketError::Redis(e) => RedisError::new_err(e),
-            TokenBucketError::ChannelError(e) => PyRuntimeError::new_err(e),
-            TokenBucketError::ParseIntError(e) => PyRuntimeError::new_err(e),
-            TokenBucketError::JoinError(e) => PyRuntimeError::new_err(e),
+            TokenBucketError::RuntimeError(e) => PyRuntimeError::new_err(e),
         }
     }
 }
@@ -42,24 +38,24 @@ impl From<RedisLibError> for TokenBucketError {
 
 impl From<ParseIntError> for TokenBucketError {
     fn from(e: ParseIntError) -> Self {
-        TokenBucketError::ParseIntError(e.to_string())
+        TokenBucketError::RuntimeError(e.to_string())
     }
 }
 
 impl From<JoinError> for TokenBucketError {
     fn from(e: JoinError) -> Self {
-        TokenBucketError::JoinError(e.to_string())
+        TokenBucketError::RuntimeError(e.to_string())
     }
 }
 
 impl<T> From<SendError<T>> for TokenBucketError {
     fn from(e: SendError<T>) -> Self {
-        TokenBucketError::ChannelError(e.to_string())
+        TokenBucketError::RuntimeError(e.to_string())
     }
 }
 
 impl From<RecvError> for TokenBucketError {
     fn from(e: RecvError) -> Self {
-        TokenBucketError::ChannelError(e.to_string())
+        TokenBucketError::RuntimeError(e.to_string())
     }
 }

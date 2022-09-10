@@ -16,8 +16,7 @@ create_exception!(timely, MaxPositionExceededError, PyException);
 pub(crate) enum SemaphoreError {
     MaxPositionExceeded(String),
     Redis(String),
-    ChannelError(String),
-    JoinError(String),
+    RuntimeError(String),
 }
 
 // Map relevant error types to appropriate Python exceptions
@@ -26,8 +25,7 @@ impl From<SemaphoreError> for PyErr {
         match e {
             SemaphoreError::MaxPositionExceeded(e) => MaxPositionExceededError::new_err(e),
             SemaphoreError::Redis(e) => RedisError::new_err(e),
-            SemaphoreError::ChannelError(e) => PyRuntimeError::new_err(e),
-            SemaphoreError::JoinError(e) => PyRuntimeError::new_err(e),
+            SemaphoreError::RuntimeError(e) => PyRuntimeError::new_err(e),
         }
     }
 }
@@ -40,18 +38,18 @@ impl From<RedisLibError> for SemaphoreError {
 
 impl From<JoinError> for SemaphoreError {
     fn from(e: JoinError) -> Self {
-        SemaphoreError::JoinError(e.to_string())
+        SemaphoreError::RuntimeError(e.to_string())
     }
 }
 
 impl<T> From<SendError<T>> for SemaphoreError {
     fn from(e: SendError<T>) -> Self {
-        SemaphoreError::ChannelError(e.to_string())
+        SemaphoreError::RuntimeError(e.to_string())
     }
 }
 
 impl From<RecvError> for SemaphoreError {
     fn from(e: RecvError) -> Self {
-        SemaphoreError::ChannelError(e.to_string())
+        SemaphoreError::RuntimeError(e.to_string())
     }
 }
