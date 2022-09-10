@@ -1,5 +1,4 @@
 use crate::errors::RedisError;
-use crate::token_bucket::ThreadState;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
@@ -53,14 +52,8 @@ impl From<JoinError> for TokenBucketError {
     }
 }
 
-impl From<SendError<&ThreadState>> for TokenBucketError {
-    fn from(e: SendError<&ThreadState>) -> Self {
-        TokenBucketError::ChannelError(e.to_string())
-    }
-}
-
-impl From<SendError<ThreadState>> for TokenBucketError {
-    fn from(e: SendError<ThreadState>) -> Self {
+impl<T> From<SendError<T>> for TokenBucketError {
+    fn from(e: SendError<T>) -> Self {
         TokenBucketError::ChannelError(e.to_string())
     }
 }

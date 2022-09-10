@@ -73,15 +73,13 @@ pub(crate) async fn clean_up(ts: ThreadState) -> SemResult<()> {
     s1.send(S {
         client: ts.client.to_owned(),
         queue_key: ts.queue_key.to_owned(),
-    })
-    .unwrap();
+    })?;
 
     let (s2, r2) = channel();
     s2.send(S {
         client: ts.client.to_owned(),
         queue_key: ts.queue_key.to_owned(),
-    })
-    .unwrap();
+    })?;
 
     let task1: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
         let slf = r1.recv()?;

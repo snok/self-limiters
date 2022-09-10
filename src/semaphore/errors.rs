@@ -1,6 +1,5 @@
 use crate::errors::RedisError;
 
-use crate::semaphore::ThreadState;
 use pyo3::create_exception;
 use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
@@ -45,14 +44,8 @@ impl From<JoinError> for SemaphoreError {
     }
 }
 
-impl From<SendError<&ThreadState>> for SemaphoreError {
-    fn from(e: SendError<&ThreadState>) -> Self {
-        SemaphoreError::ChannelError(e.to_string())
-    }
-}
-
-impl From<SendError<ThreadState>> for SemaphoreError {
-    fn from(e: SendError<ThreadState>) -> Self {
+impl<T> From<SendError<T>> for SemaphoreError {
+    fn from(e: SendError<T>) -> Self {
         SemaphoreError::ChannelError(e.to_string())
     }
 }
