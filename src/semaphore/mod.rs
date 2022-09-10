@@ -1,21 +1,17 @@
 extern crate redis;
 
-use std::num::NonZeroUsize;
-use std::sync::mpsc::channel;
-
-use log::debug;
 use nanoid::nanoid;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
-use redis::{parse_redis_url, AsyncCommands, Client, LposOptions};
-use tokio::task::JoinHandle;
+use redis::{parse_redis_url, Client};
 
 use crate::semaphore::errors::SemaphoreError;
-use crate::semaphore::utils::{estimate_appropriate_sleep_duration, SemResult};
-use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
+use crate::semaphore::logic::{clean_up, wait_for_slot};
+use crate::utils::{receive_shared_state, send_shared_state};
 
 pub(crate) mod errors;
+pub(crate) mod logic;
 pub(crate) mod utils;
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -39,102 +35,6 @@ impl ThreadState {
             client: slf.client.clone(),
             identifier: slf.id.clone(),
         }
-    }
-
-    /// Enter queue and return when the Semaphore has capacity.
-    async fn wait_for_slot(self) -> Result<(), PyErr> {
-        // Open redis connection
-        let mut connection = open_client_connection::<Client, SemaphoreError>(&self.client).await?;
-
-        // Enter queue and get the current position
-        let mut position = connection
-            .rpush(&self.queue_key, &self.identifier)
-            .await
-            .map_err(|e| PyErr::from(SemaphoreError::from(e)))?;
-        debug!("Entered queue in position {}", position);
-
-        loop {
-            // If our position is within the Semaphore's capacity, return
-            if position < self.capacity {
-                debug!("Position is less than capacity. Returning.");
-                break;
-            }
-
-            // If the position exceeds the maximum tolerated position, throw an error
-            if self.max_position > 0 && position > self.max_position {
-                debug!("Position is greater than max position. Returning.");
-                return Err(PyErr::from(SemaphoreError::MaxPositionExceeded(format!(
-                    "Position {} exceeds the max position ({}).",
-                    position, self.max_position
-                ))));
-            }
-
-            // Otherwise, sleep for a bit and check again
-            let sleep_duration = estimate_appropriate_sleep_duration(
-                &position,
-                &self.capacity,
-                &self.sleep_duration,
-            );
-            debug!(
-                "Position {} is greater than capacity ({}). Sleeping",
-                position, self.capacity
-            );
-            tokio::time::sleep(sleep_duration).await;
-
-            // Retrieve position again
-            position = connection
-                .lpos::<&Vec<u8>, &Vec<u8>, Option<u32>>(
-                    &self.queue_key,
-                    &self.identifier,
-                    LposOptions::default(),
-                )
-                .await
-                .map_err(|e| PyErr::from(SemaphoreError::from(e)))?
-                .unwrap_or(1);
-            debug!("Position is now {}", position);
-        }
-        Ok(())
-    }
-
-    /// Pop from the queue, to add capacity back to the
-    /// semaphore, and refresh expiry for the queue.
-    async fn clean_up(self) -> SemResult<()> {
-        struct S {
-            client: Client,
-            queue_key: Vec<u8>,
-        }
-
-        let (s1, r1) = channel();
-        s1.send(S {
-            client: self.client.to_owned(),
-            queue_key: self.queue_key.to_owned(),
-        })
-        .unwrap();
-
-        let (s2, r2) = channel();
-        s2.send(S {
-            client: self.client.to_owned(),
-            queue_key: self.queue_key.to_owned(),
-        })
-        .unwrap();
-
-        let task1: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
-            let slf = r1.recv()?;
-            let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
-            con.expire(&slf.queue_key, 30_usize).await?;
-            Ok(())
-        });
-
-        let task2: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
-            let slf = r2.recv()?;
-            let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
-            con.lpop(&slf.queue_key, NonZeroUsize::new(1_usize)).await?;
-            Ok(())
-        });
-
-        task1.await??;
-        task2.await??;
-        Ok(())
     }
 }
 
@@ -190,7 +90,7 @@ impl Semaphore {
         let receiver = send_shared_state::<ThreadState, SemaphoreError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
             let shared_state = receive_shared_state::<ThreadState, SemaphoreError>(receiver)?;
-            shared_state.wait_for_slot().await?;
+            wait_for_slot(shared_state).await?;
             Ok(())
         })
     }
@@ -200,7 +100,7 @@ impl Semaphore {
         let receiver = send_shared_state::<ThreadState, SemaphoreError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
             let shared_state = receive_shared_state::<ThreadState, SemaphoreError>(receiver)?;
-            shared_state.clean_up().await?;
+            clean_up(shared_state).await?;
             Ok(())
         })
     }
