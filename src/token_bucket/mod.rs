@@ -131,7 +131,7 @@ impl TokenBucket {
         // Return future for the python event loop
         let r2 = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let shared_state = receive_shared_state::<ThreadState, TokenBucketError>(r2).unwrap();
+            let shared_state = receive_shared_state::<ThreadState, TokenBucketError>(r2)?;
             wait_for_slot(shared_state).await?;
             Ok(())
         })

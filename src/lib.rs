@@ -80,8 +80,7 @@ mod tests {
         let tokens_left_for_slot = data.tokens_left_for_slot.to_owned();
 
         data.set(&"test-data-readwrite".to_string(), &mut connection)
-            .await
-            .unwrap();
+            .await?;
 
         let stored_data =
             Data::get(&"test-data-readwrite".to_string(), &0.5, 1, &mut connection).await?;

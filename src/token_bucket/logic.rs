@@ -73,9 +73,7 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 
 pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
     // Open redis connection
-    let mut connection = open_client_connection::<&Client, TokenBucketError>(&ts.client)
-        .await
-        .unwrap();
+    let mut connection = open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
 
     // Try to acquire scheduler lock
     let url = format!("redis://{}", ts.client.get_connection_info().addr);
@@ -119,7 +117,7 @@ pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
         let size = NonZeroUsize::new(number_of_nodes_to_fetch as usize);
         // debug!("s Fetching {:?} nodes", size);
         let maybe_nodes = connection
-            .rpop::<&String, Option<Vec<String>>>(&ts.queue_key, Some(size).unwrap())
+            .rpop::<&String, Option<Vec<String>>>(&ts.queue_key, size)
             .await?;
 
         let nodes = match maybe_nodes {

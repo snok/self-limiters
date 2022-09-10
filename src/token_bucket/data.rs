@@ -37,13 +37,13 @@ impl Data {
     }
 
     /// Deserialize bytes from Redis, using the format specified above.
-    fn deserialize(bytes: Vec<u8>) -> Data {
+    fn deserialize(bytes: Vec<u8>) -> TBResult<Data> {
         let s = String::from_utf8_lossy(&bytes);
         let v: Vec<&str> = s.split(SEPARATOR).collect();
-        Data {
-            slot: v[0].parse::<u64>().unwrap(),
-            tokens_left_for_slot: v[1].parse::<i32>().unwrap(),
-        }
+        Ok(Data {
+            slot: v[0].parse::<u64>()?,
+            tokens_left_for_slot: v[1].parse::<i32>()?,
+        })
     }
 
     /// Retrieve data instance from Redis.
@@ -54,7 +54,7 @@ impl Data {
         connection: &mut Connection,
     ) -> TBResult<Data> {
         match connection.get::<&String, Option<Vec<u8>>>(data_key).await? {
-            Some(bytes) => Ok(Data::deserialize(bytes)),
+            Some(bytes) => Ok(Data::deserialize(bytes)?),
             None => Ok(Self::new(frequency, amount)),
         }
     }
