@@ -17,7 +17,15 @@ test:
 > cargo llvm-cov clean --workspace
 > cargo test
 > maturin develop
-> coverage run -m pytest tests
-> coverage xml
-> cargo llvm-cov report
+> coverage run -m pytest tests && coverage xml
+> cargo llvm-cov report --lcov --output-path coverage.lcov
 .PHONY: test
+
+fmt:
+> pre-commit run --all-files
+.PHONY: fmt
+
+fix:
+> git add .
+> cargo clippy --fix --allow-staged
+.PHONY: fix

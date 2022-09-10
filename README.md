@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/sondrelg/timely/branch/main/graph/badge.svg?token=Q4YJPOFC1F)](https://codecov.io/gh/sondrelg/timely)
+
 # Timely
 
 > This is currently a work in progress.
