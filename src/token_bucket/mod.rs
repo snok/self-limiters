@@ -19,17 +19,17 @@ pub(crate) mod logic;
 pub(crate) mod utils;
 
 /// Pure rust DTO for the data we need to pass to our thread
-/// We could pass the Semaphore itself, but this seemed simpler.
+/// We could pass the token bucket itself, but this seemed simpler.
 pub struct ThreadState {
+    client: Client,
+    name: String,
+    queue_key: String,
+    data_key: String,
+    id: String,
     capacity: u32,
+    max_sleep: Duration,
     frequency: f32,
     amount: u32,
-    client: Client,
-    max_sleep: Duration,
-    name: String,
-    id: String,
-    data_key: String,
-    queue_key: String,
 }
 
 impl ThreadState {
@@ -93,7 +93,6 @@ impl TokenBucket {
         let id = nanoid!(10);
         let data_key = format!("__timely-{}-data", name);
         let queue_key = format!("__timely-{}-queue", name);
-
         Ok(Self {
             capacity,
             client,

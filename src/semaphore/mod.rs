@@ -17,12 +17,12 @@ pub(crate) mod utils;
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
 pub(crate) struct ThreadState {
+    client: Client,
     queue_key: String,
+    id: String,
     capacity: u32,
     max_position: u32,
     sleep_duration: f32,
-    id: String,
-    client: Client,
 }
 
 impl ThreadState {

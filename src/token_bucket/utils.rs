@@ -1,21 +1,22 @@
 use crate::token_bucket::error::TokenBucketError;
 use redis::AsyncCommands;
 
+use crate::token_bucket::ThreadState;
 use redis::aio::Connection;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub(crate) type TBResult<T> = Result<T, TokenBucketError>;
 
-// Return a lower-bound answer to how long (at least) a node will need to wait before
-// it's slot is due. We do this to reduce unnecessary i/o.
-// In a bucket that fills up one token per minute, position 10 in the
-// queue will be due in 10 minutes or more. That means there's no reason
-// to check Redis for assigned slots for the next close-to-10-minutes.
-// Note, we say "10 minutes or more", since the position a node receives when entering
-// the queue isn't actually it's position in the absolute queue. It's its position in the
-// redis list representing the unscheduled nodes in the queue. A node could be told it is
-// position 1 in the queue when there are actually 100 nodes scheduled before it.
-// Position 1 only represent the lowest possible position it can have.
+/// Return a lower-bound answer to how long (at least) a node will need to wait before
+/// it's slot is due. We do this to reduce unnecessary i/o.
+/// In a bucket that fills up one token per minute, position 10 in the
+/// queue will be due in 10 minutes or more. That means there's no reason
+/// to check Redis for assigned slots for the next close-to-10-minutes.
+/// Note, we say "10 minutes or more", since the position a node receives when entering
+/// the queue isn't actually it's position in the absolute queue. It's its position in the
+/// redis list representing the unscheduled nodes in the queue. A node could be told it is
+/// position 1 in the queue when there are actually 100 nodes scheduled before it.
+/// Position 1 only represent the lowest possible position it can have.
 pub fn minimum_time_until_slot(
     position: &i64,
     capacity: &i64,
@@ -89,4 +90,14 @@ pub(crate) fn now_millis() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64
+}
+
+pub(crate) async fn sleep_based_on_position(position: &i64, ts: &ThreadState) -> TBResult<()> {
+    let sleep_duration = Duration::from_millis(minimum_time_until_slot(
+        position,
+        &(ts.capacity as i64),
+        &ts.frequency,
+        &ts.amount,
+    ) as u64);
+    sleep_for(sleep_duration, ts.max_sleep).await
 }

@@ -15,7 +15,7 @@ use crate::utils::open_client_connection;
 
 /// Enter queue and return when the Semaphore has capacity.
 pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
-    // Open redis connection
+    // Connect to redis
     let mut connection = open_client_connection::<Client, SemaphoreError>(&ts.client).await?;
 
     // Enter queue and get the current position
@@ -68,30 +68,29 @@ pub(crate) async fn clean_up(ts: ThreadState) -> SemResult<()> {
         client: Client,
         queue_key: String,
     }
-
     let (s1, r1) = channel();
+    let (s2, r2) = channel();
+
     s1.send(S {
         client: ts.client.to_owned(),
         queue_key: ts.queue_key.to_owned(),
     })?;
-
-    let (s2, r2) = channel();
     s2.send(S {
-        client: ts.client.to_owned(),
-        queue_key: ts.queue_key.to_owned(),
+        client: ts.client,
+        queue_key: ts.queue_key,
     })?;
 
     let task1: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
-        let slf = r1.recv()?;
-        let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
-        con.expire(&slf.queue_key, 30_usize).await?;
+        let data = r1.recv()?;
+        let mut con = open_client_connection::<Client, SemaphoreError>(&data.client).await?;
+        con.expire(&data.queue_key, 30_usize).await?;
         Ok(())
     });
-
     let task2: JoinHandle<SemResult<()>> = tokio::task::spawn(async move {
-        let slf = r2.recv()?;
-        let mut con = open_client_connection::<Client, SemaphoreError>(&slf.client).await?;
-        con.lpop(&slf.queue_key, NonZeroUsize::new(1_usize)).await?;
+        let data = r2.recv()?;
+        let mut con = open_client_connection::<Client, SemaphoreError>(&data.client).await?;
+        con.lpop(&data.queue_key, NonZeroUsize::new(1_usize))
+            .await?;
         Ok(())
     });
 

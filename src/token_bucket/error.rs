@@ -5,6 +5,7 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
 use std::num::ParseIntError;
+use std::string::FromUtf8Error;
 use std::sync::mpsc::{RecvError, SendError};
 use tokio::task::JoinError;
 
@@ -56,6 +57,12 @@ impl<T> From<SendError<T>> for TokenBucketError {
 
 impl From<RecvError> for TokenBucketError {
     fn from(e: RecvError) -> Self {
+        TokenBucketError::RuntimeError(e.to_string())
+    }
+}
+
+impl From<FromUtf8Error> for TokenBucketError {
+    fn from(e: FromUtf8Error) -> Self {
         TokenBucketError::RuntimeError(e.to_string())
     }
 }

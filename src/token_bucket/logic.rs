@@ -9,27 +9,17 @@ use redlock::{Lock, RedLock};
 use crate::token_bucket::data::{Data, MIN_BUFFER};
 use crate::token_bucket::error::TokenBucketError;
 use crate::token_bucket::utils::{
-    create_node_key, minimum_time_until_slot, nodes_to_fetch, now_millis, set_scheduled, sleep_for,
+    create_node_key, nodes_to_fetch, now_millis, set_scheduled, sleep_based_on_position, sleep_for,
     was_scheduled, TBResult,
 };
 use crate::token_bucket::ThreadState;
 use crate::utils::open_client_connection;
 
-async fn sleep_based_on_position(position: &i64, ts: &ThreadState) -> TBResult<()> {
-    let sleep_duration = Duration::from_millis(minimum_time_until_slot(
-        position,
-        &(ts.capacity as i64),
-        &ts.frequency,
-        &ts.amount,
-    ) as u64);
-    sleep_for(sleep_duration, ts.max_sleep).await
-}
-
 pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
     // Connect to redis
     let mut connection = open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
 
-    // Enter queue
+    // Enter queue and get the current position
     // Note: The position received here is *not* an indication of where we are
     // relative to the next slot, since the queue is rpop'ed from. Instead,
     // it is an indication of how close we are to being assigned a slot.
@@ -37,8 +27,10 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
         .rpush(&ts.queue_key, &ts.id)
         .await
         .map_err(|e| PyErr::from(TokenBucketError::from(e)))?;
+    debug!("node {}: Entered queue in position {}", &ts.id, position);
 
-    // Since there's a ~0% chance we've already been assigned a slot, take a chill pill, then check
+    // Since there's a ~0% chance we've already been assigned a slot
+    // so we sleep a little before progressing
     sleep_based_on_position(&position, &ts).await?;
 
     // Create node key
@@ -55,11 +47,11 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
         if slot.is_some() {
             let sleep_duration = Duration::from_millis((slot.unwrap() - now_millis()) as u64);
             sleep_for(sleep_duration, ts.max_sleep).await?;
-            debug!("w {} Breaking", &ts.id);
+            debug!("node {}: Breaking", &ts.id);
             break;
         };
 
-        // Re-check position
+        // Check current position
         position = connection
             .lpos(&ts.queue_key, &ts.id, LposOptions::default())
             .await
@@ -82,15 +74,17 @@ pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
     let (lock, expiry): (Lock, u64) = loop {
         match redlock.lock(ts.name.as_bytes(), 1000) {
             Some(l) => {
-                info!("{} won lock", ts.id);
+                info!("scheduler {}: Won scheduler lock", ts.id);
                 let expiry = now_millis() + l.validity_time.to_owned() as u64;
                 break (l, expiry - 50);
             }
             None => {
                 if was_scheduled(&ts.id, &mut connection).await? {
                     // Another scheduler has done the job for us.
+                    debug!("node {}: Found slot scheduled by other scheduler", ts.id);
                     return Ok(());
                 } else {
+                    debug!("node {}: Waiting to be scheduled by other scheduler", ts.id);
                     tokio::time::sleep(Duration::from_millis(20)).await;
                     continue;
                 };
@@ -110,23 +104,27 @@ pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
         // Refresh slot, token count, etc.
         data = data.update_bucket(ts.frequency, ts.amount, ts.capacity);
 
-        // Figure out how many nodes, n, to fetch
+        // Figure out how many nodes to fetch
         let number_of_nodes_to_fetch = nodes_to_fetch(data.tokens_left_for_slot as u32, ts.amount);
+        debug!(
+            "scheduler {}: Fetching {} nodes",
+            ts.id, number_of_nodes_to_fetch
+        );
 
         // Fetch between 0-n nodes
         let size = NonZeroUsize::new(number_of_nodes_to_fetch as usize);
-        // debug!("s Fetching {:?} nodes", size);
-        let maybe_nodes = connection
-            .rpop::<&String, Option<Vec<String>>>(&ts.queue_key, size)
-            .await?;
 
-        let nodes = match maybe_nodes {
+        let nodes = match connection
+            .rpop::<&String, Option<Vec<String>>>(&ts.queue_key, size)
+            .await?
+        {
             Some(nodes) => nodes,
             None => {
                 if was_scheduled(&ts.id, &mut connection).await? {
+                    info!("scheduler {}: Finished scheduling", ts.id);
                     break;
                 } else {
-                    // info!("s Sticking around since I havent been scheduled");
+                    debug!("scheduler {}: Finished scheduling, but need to schedule myself before returning", ts.id);
                     continue;
                 };
             }
@@ -146,12 +144,15 @@ pub(crate) async fn schedule(ts: ThreadState) -> TBResult<()> {
             connection.set(&node_key, slot_value).await?;
             set_scheduled(&node, &mut connection).await?;
             data.tokens_left_for_slot -= 1;
-            debug!("Assigned slot {} to node `{}`", slot_value, node);
+            debug!(
+                "scheduler {}: Assigned slot {} to node `{}`",
+                ts.id, slot_value, node
+            );
         }
     }
 
     data.set(&ts.data_key, &mut connection).await?;
-    info!("Releasing lock");
+    info!("scheduler {}: Releasing lock", ts.id);
     redlock.unlock(&lock);
     Ok(())
 }
