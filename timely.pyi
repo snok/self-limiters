@@ -17,7 +17,6 @@ class TokenBucket:
     refill_frequency: float
     refill_amount: int
     redis_url: str
-    queue_key: str
 
     async def __aenter__(self) -> None: ...
     async def __aexit__(
