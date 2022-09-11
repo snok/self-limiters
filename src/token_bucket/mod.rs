@@ -89,6 +89,16 @@ impl TokenBucket {
                 ))));
             }
         };
+        if refill_frequency <= 0.0 {
+            return Err(PyErr::from(TokenBucketError::ValueError(String::from(
+                "Refill frequency must be gt 0",
+            ))));
+        }
+        if refill_amount <= 0 {
+            return Err(PyErr::from(TokenBucketError::ValueError(String::from(
+                "Refill amount must be gt 0",
+            ))));
+        }
         let client = Client::open(url).expect("Failed to connect to Redis");
         let id = nanoid!(10);
         let data_key = format!("__timely-{}-data", name);

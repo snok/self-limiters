@@ -38,14 +38,22 @@ pub(crate) async fn wait_for_slot(ts: ThreadState) -> Result<(), PyErr> {
 
     loop {
         // Check for slot
-        let slot: Option<u64> = connection
+        let maybe_slot: Option<u64> = connection
             .get(&node_key)
             .await
             .map_err(|e| PyErr::from(TokenBucketError::from(e)))?;
 
         // When slot is found, sleep until it's due
-        if slot.is_some() {
-            let sleep_duration = Duration::from_millis((slot.unwrap() - now_millis()) as u64);
+        if maybe_slot.is_some() {
+            let slot = maybe_slot.unwrap();
+            let now = now_millis();
+            let sleep_duration = {
+                if slot <= now {
+                    Duration::from_millis(0)
+                } else {
+                    Duration::from_millis((slot - now) as u64)
+                }
+            };
             sleep_for(sleep_duration, ts.max_sleep).await?;
             debug!("node {}: Breaking", &ts.id);
             break;

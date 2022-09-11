@@ -1,7 +1,7 @@
 use crate::errors::RedisError;
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
 use pyo3::exceptions::PyRuntimeError;
+use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
 use std::num::ParseIntError;
@@ -18,6 +18,7 @@ pub enum TokenBucketError {
     MaxSleepExceeded(String),
     Redis(String),
     RuntimeError(String),
+    ValueError(String),
 }
 
 // Map relevant error types to appropriate Python exceptions
@@ -27,6 +28,7 @@ impl From<TokenBucketError> for PyErr {
             TokenBucketError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
             TokenBucketError::Redis(e) => RedisError::new_err(e),
             TokenBucketError::RuntimeError(e) => PyRuntimeError::new_err(e),
+            TokenBucketError::ValueError(e) => PyValueError::new_err(e),
         }
     }
 }
