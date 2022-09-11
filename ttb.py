@@ -29,7 +29,7 @@ async def _consume(name):
 
 async def main():
     name = uuid4().hex[:6]
-    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(49)])
+    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(99)])
     print('FINISHED ALL')  # noqa
 
 

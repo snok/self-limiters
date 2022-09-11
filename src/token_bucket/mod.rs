@@ -1,21 +1,17 @@
-use std::thread;
 use std::time::Duration;
 
-use nanoid::nanoid;
-
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::{PyAny, PyErr, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{parse_redis_url, Client};
 
-use crate::utils::{receive_shared_state, send_shared_state};
+use crate::token_bucket::utils::{get_script, now_millis, sleep_for};
+use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
 use error::TokenBucketError;
-use logic::{schedule, wait_for_slot};
 
-pub(crate) mod data;
 pub(crate) mod error;
-pub(crate) mod logic;
 pub(crate) mod utils;
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -23,13 +19,10 @@ pub(crate) mod utils;
 pub struct ThreadState {
     pub(crate) client: Client,
     pub(crate) name: String,
-    pub(crate) queue_key: String,
-    pub(crate) data_key: String,
-    pub(crate) id: String,
     pub(crate) capacity: u32,
-    pub(crate) max_sleep: Duration,
     pub(crate) frequency: f32,
     pub(crate) amount: u32,
+    pub(crate) max_sleep: Duration,
 }
 
 impl ThreadState {
@@ -41,9 +34,6 @@ impl ThreadState {
             client: slf.client.clone(),
             max_sleep: slf.max_sleep,
             name: slf.name.clone(),
-            id: slf.id.clone(),
-            data_key: slf.data_key.clone(),
-            queue_key: slf.queue_key.clone(),
         }
     }
 }
@@ -60,13 +50,8 @@ pub struct TokenBucket {
     refill_amount: u32,
     #[pyo3(get)]
     name: String,
-    #[pyo3(get)]
-    id: String,
-    #[pyo3(get)]
-    queue_key: String,
     max_sleep: Duration,
     client: Client,
-    data_key: String,
 }
 
 #[pymethods]
@@ -75,9 +60,9 @@ impl TokenBucket {
     #[new]
     fn new(
         name: String,
-        capacity: u32,
+        capacity: i64,
         refill_frequency: f32,
-        refill_amount: u32,
+        refill_amount: i64,
         redis_url: Option<&str>,
         max_sleep: Option<f64>,
     ) -> PyResult<Self> {
@@ -89,20 +74,33 @@ impl TokenBucket {
                 ))));
             }
         };
-        let client = Client::open(url).expect("Failed to connect to Redis");
-        let id = nanoid!(10);
-        let data_key = format!("__timely-{}-data", name);
-        let queue_key = format!("__timely-{}-queue", name);
+        let client = match Client::open(url) {
+            Ok(client) => client,
+            Err(e) => {
+                return Err(PyErr::from(TokenBucketError::Redis(format!(
+                    "Failed to connect to redis: {}",
+                    e
+                ))));
+            }
+        };
+
+        if refill_frequency <= 0.0 {
+            return Err(PyValueError::new_err(
+                "Refill frequency must be greater than 0",
+            ));
+        }
+        if refill_amount <= 0 {
+            return Err(PyValueError::new_err(
+                "Refill amount must be greater than 0",
+            ));
+        }
         Ok(Self {
-            capacity,
+            capacity: capacity as u32,
             client,
-            refill_amount,
+            refill_amount: refill_amount as u32,
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
-            id,
-            name,
-            data_key,
-            queue_key,
+            name: format!("__timely-{}", name),
         })
     }
 
@@ -110,28 +108,35 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        // Spawn a thread to run scheduling
-        let r1 = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
-
-        py.allow_threads(move || {
-            thread::spawn(move || {
-                tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build()
-                    .unwrap()
-                    .block_on(async {
-                        let shared_state =
-                            receive_shared_state::<ThreadState, TokenBucketError>(r1).unwrap();
-                        schedule(shared_state).await.unwrap();
-                    });
-            });
-        });
-
         // Return future for the python event loop
-        let r2 = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let shared_state = receive_shared_state::<ThreadState, TokenBucketError>(r2)?;
-            wait_for_slot(shared_state).await?;
+            let ts = receive_shared_state::<ThreadState, TokenBucketError>(receiver)?;
+
+            // Connect to redis
+            let mut connection =
+                open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
+
+            // Retrieve slot
+            let script = get_script();
+            let slot: u64 = script
+                .key(&ts.name)
+                .arg(ts.capacity) // capacity
+                .arg((ts.frequency * 1000.0) as u64) // refill rate in ms
+                .arg(ts.amount) // refill amount
+                .invoke_async(&mut connection)
+                .await
+                .expect("something went badly");
+
+            let now = now_millis();
+            let sleep_duration = {
+                if slot <= now {
+                    Duration::from_millis(0)
+                } else {
+                    Duration::from_millis((slot - now) as u64)
+                }
+            };
+            sleep_for(sleep_duration, ts.max_sleep).await?;
             Ok(())
         })
     }
@@ -146,9 +151,6 @@ impl TokenBucket {
     /// this, the class is printed as builtin.TokenBucket, which
     /// is pretty confusing.
     fn __repr__(&self) -> String {
-        format!(
-            "Token bucket instance {} for queue {}",
-            &self.id, &self.queue_key
-        )
+        format!("Token bucket instance for queue {}", &self.name)
     }
 }

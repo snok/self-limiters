@@ -25,7 +25,7 @@ async def test_redis_error_on_init():
         await run(tokenbucket_factory(redis_url='test'), 0)
 
 
-async def test_error(caplog):
+async def test_redis_error():
     """
     Make sure redis errors in the redis crate are propagated as timely.RedisError.
 
