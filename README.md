@@ -86,11 +86,9 @@ while True:
 
 ## The token bucket implementation
 
-The token bucket implementation is useful when you need to limit a process
-to `n` actions per `m` seconds.
-
-The token bucket algorithm, in short, is meant to work by having a token added every `m` seconds. When there
-is a token in the bucket, a queueing node can consume it and continue.
+The token bucket implementation is useful when you need to limit a
+process to a certain number of actions per unit of time. For
+example, 1 request per minute.
 
 This implementation, unlike the semaphore algorithm, does not rely on continuous polling to see whether there is
 capacity or not. Instead, we let a scheduler process work out *when* a token would have been added for each node
@@ -102,7 +100,8 @@ The code flow goes:
 <img width=800 heigh=800 src="docs/token_bucket.png"></img>
 
 By implementing parts of the logic in a [Lua](https://www.lua.org/) script, we're able to get great
-performance, while minimising i/o. Since redis is single-threaded it also reduces complexity greatly.
+performance, and reduce i/o. Since redis is single-threaded, scripts are considered atomic,
+which also reduces complexity greatly.
 
 ### Usage
 
