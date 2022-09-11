@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::{PyAny, PyErr, PyResult, Python};
@@ -59,13 +60,12 @@ impl TokenBucket {
     #[new]
     fn new(
         name: String,
-        capacity: u32,
+        capacity: i64,
         refill_frequency: f32,
-        refill_amount: u32,
+        refill_amount: i64,
         redis_url: Option<&str>,
         max_sleep: Option<f64>,
     ) -> PyResult<Self> {
-        // TODO: Stop returning TokenBucketError - just return PyErrs
         let url = match parse_redis_url(redis_url.unwrap_or("redis://127.0.0.1:6379")) {
             Some(url) => url,
             None => {
@@ -74,21 +74,30 @@ impl TokenBucket {
                 ))));
             }
         };
+        let client = match Client::open(url) {
+            Ok(client) => client,
+            Err(e) => {
+                return Err(PyErr::from(TokenBucketError::Redis(format!(
+                    "Failed to connect to redis: {}",
+                    e
+                ))));
+            }
+        };
+
         if refill_frequency <= 0.0 {
-            return Err(PyErr::from(TokenBucketError::ValueError(String::from(
-                "Refill frequency must be gt 0",
-            ))));
+            return Err(PyValueError::new_err(
+                "Refill frequency must be greater than 0",
+            ));
         }
         if refill_amount <= 0 {
-            return Err(PyErr::from(TokenBucketError::ValueError(String::from(
-                "Refill amount must be gt 0",
-            ))));
+            return Err(PyValueError::new_err(
+                "Refill amount must be greater than 0",
+            ));
         }
-        let client = Client::open(url).expect("Failed to connect to Redis");
         Ok(Self {
-            capacity,
+            capacity: capacity as u32,
             client,
-            refill_amount,
+            refill_amount: refill_amount as u32,
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
             name: format!("__timely-{}", name),
