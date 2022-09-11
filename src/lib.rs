@@ -41,7 +41,7 @@ mod tests {
     use crate::token_bucket::error::TokenBucketError;
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
     use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
-    use redis::{AsyncCommands, Client, RedisResult};
+    use redis::{AsyncCommands, Client};
     use std::thread;
     use std::time::Duration;
 
@@ -125,7 +125,7 @@ mod tests {
         // Send and receive w/o thread
         let receiver =
             send_shared_state::<SemaphoreThreadState, SemaphoreError>(SemaphoreThreadState {
-                client: client.to_owned(),
+                client: client,
                 queue_key: queue_key.to_owned(),
                 id: id.to_owned(),
                 capacity: capacity.to_owned(),
@@ -161,7 +161,7 @@ mod tests {
         // Send and receive w/o thread
         let receiver =
             send_shared_state::<TokenBucketThreadState, TokenBucketError>(TokenBucketThreadState {
-                client: client.to_owned(),
+                client: client,
                 queue_key: queue_key.to_owned(),
                 data_key: data_key.to_owned(),
                 name: name.to_owned(),
