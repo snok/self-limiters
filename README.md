@@ -4,18 +4,17 @@
 
 > This is currently a work in progress.
 
-Timely provides a way to rate-limit your Python processes.
+Timely provides two types of rate limiters, as a way to police your own processes.
 
-It is not uncommon for rate-limited APIs to punish clients when
-they exceed a limit, so it's usually a good idea for clients to police
-themselves in these cases.
+Rate-limited APIs often enforce the rate limits by penalizing excessive use.
+It's generally in everyone's interest that this doesn't happen.
 
 This package contains one implementation for concurrency-based time limits
 ([semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming))),
 and one implementation for time-based rate limits
 ([token bucket](https://en.wikipedia.org/wiki/Token_bucket)).
 
-Both implementations `async`, fair, and queues are distributed using [Redis](https://redis.io).
+Both implementations are async, FIFO, and queues are distributed using [Redis](https://redis.io).
 
 ## Installation
 
@@ -65,7 +64,9 @@ this slightly, we specify that the queue should expire after a short period of i
 </ol>
 </details>
 
-It is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
+### Usage
+
+The utility is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
 
 ```python
 from timely import Semaphore
@@ -94,65 +95,18 @@ is a token in the bucket, a queueing node can consume it and continue.
 This implementation, unlike the semaphore algorithm, does not rely on continuous polling to see whether there is
 capacity or not. Instead, we let a scheduler process work out *when* a token would have been added for each node
 in the queue, and let the nodes sleep until it's time to consume their token. The aim is to minimize i/o and maximize
-sleeping, as sleeping asynchronously will free up the event loop to do other things.
-
-By implementing this in Rust, we're able to get around the [GIL](https://realpython.com/python-gil/), and
-structure some logic in a separate thread. See [pyo3's](https://pyo3.rs/) section on
-[parallelism](https://pyo3.rs/v0.16.4/parallelism.html) for more details.
+sleep, as sleeping asynchronously frees up the event loop to do other things.
 
 The code flow goes:
 
 <img width=800 heigh=800 src="docs/token_bucket.png"></img>
 
-<details>
-<summary><b>Flow breakdown</b></summary>
-<ol>
-<li>Enter queue (<a href="https://redis.io/commands/rpush/">RPUSH</a>) and get the queue position*.
+By implementing parts of the logic in a [Lua](https://www.lua.org/) script, we're able to get great
+performance, while minimising i/o. Since redis is single-threaded it also reduces complexity greatly.
 
-Since the scheduler is spawned at the same time as our main thread, and the scheduler cannot queue our node until
-we've entered the queue, there is zero percent likelihood that we would find an assigned slot if we checked right away.
-Knowing this, we take the opportunity to sleep a little before proceeding. More info about the sleep in the next point.<br>
+### Usage
 
-*<small>The "position" here is not the absolute position of the node in the queue. The scheduler process pops IDs from
-the queue when assigning wake-up times (slots), so the position returned when entering the queue is rather an indication
-of how close our node is to have a slot assigned to it.
-</small>
-</li>
-<li>
-How long to sleep for depends on our position in the queue. As mentioned in the last point, our position is not
-the position _in_ the overall queue, but <= our real position. Knowing this we can create a lower-bound answer
-to how long we can wait, at minimum, until it's our time to consume a token.
-
-To give an example: if our position is 2, we know that our real position is 2 or more. If tokens are refilled by
-1 token at a frequency of once per second, we know we can sleep at least 2 seconds, minus a small margin.
-So we that's what we do.
-</li>
-<li>
-If we fail to acquire the lock it should mean the lock is owned. In this case we can safely exit.
-
-The image isn't exactly accurate here though, as we will poll to check that our ID has been scheduled before we actually exit.
-
-We could also fail because Redis is unavailable. We don't currently have handling for this, and assume the above has happened.
-</li>
-<li>
-The lock has an expiration of 1000ms. Between each loop of scheduling we make sure that expiration, minus a buffer, has not been reached.
-If it has, we save the bucket state and release the lock.
-
-If we didn't do this, another thread would acquire the lock, and we would start double-scheduling slots.
-</li>
-<li>
-We fetch an amount of nodes, equal to the tokens in the bucket. There's no guarantee that there will be
-any node IDs to fetch in the queue; the result will contain `0..n` IDs.
-</li>
-<li>
-It's possible, though unlikely, that the scheduler will finish scheduling all nodes before the main thread
-has had time to enter the queue. In a situation where there's only 1 node in the bucket, this could
-lead to deadlocks. To prevent this, we make sure, in the scheduler thread, that we've scheduled ourselves before exiting.
-</li>
-</ol>
-</details>
-
-It is implemented as a context manager in Python and can be used roughly as follows:
+This is also implemented as a context manager in Python and can be used roughly as follows:
 
 ```python
 from timely import TokenBucket
@@ -171,3 +125,13 @@ while True:
         # Perform the rate-limited work immediately
         client.get(...)
 ```
+
+
+## Benchmarks
+
+When testing locally:
+
+- processing 100 nodes with the semaphore implementation takes ~13ms
+- processing 100 nodes with the token bucket implementation takes ~7ms
+
+<img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
