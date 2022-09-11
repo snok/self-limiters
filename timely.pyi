@@ -46,3 +46,6 @@ class Semaphore:
     ) -> None: ...
 
 __all__: list[str]
+
+class RedisError(Exception):
+    pass

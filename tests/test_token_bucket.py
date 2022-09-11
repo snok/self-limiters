@@ -2,33 +2,12 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
-from functools import partial
-from uuid import uuid4
 
 import pytest
 
-from timely import TokenBucket
-
-from .conftest import run
+from .conftest import run, tokenbucket_factory
 
 logger = logging.getLogger(__name__)
-
-
-def tokenbucket_factory(**kwargs) -> partial:
-    """
-    Provide an almost initialized token bucket with defaults.
-
-    This makes it much easier to init token buckets with slightly different configurations in tests.
-    """
-
-    defaults = {
-        'name': uuid4().hex[:6],
-        'capacity': 1,
-        'refill_frequency': 1.0,
-        'refill_amount': 1,
-        'redis_url': 'redis://127.0.0.1:6389',
-    }
-    return partial(TokenBucket, **{**defaults, **kwargs})
 
 
 async def test_token_bucket_runtimes():

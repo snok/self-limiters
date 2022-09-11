@@ -6,3 +6,5 @@ coverage
 maturin
 uvloop
 coverage
+redis
+types-redis

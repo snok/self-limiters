@@ -41,7 +41,7 @@ mod tests {
     use crate::token_bucket::error::TokenBucketError;
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
     use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
-    use redis::Client;
+    use redis::{AsyncCommands, Client, RedisResult};
     use std::thread;
     use std::time::Duration;
 
@@ -184,6 +184,26 @@ mod tests {
             assert_eq!(copied_ts.frequency, frequency);
             assert_eq!(copied_ts.amount, amount);
         });
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn open_client_connection_token_bucket() -> TBResult<()> {
+        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
+        connection.set("test", 1).await?;
+        let result: i32 = connection.get("test").await?;
+        assert_eq!(result, 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn open_client_connection_semaphore() -> SemResult<()> {
+        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let mut connection = open_client_connection::<Client, SemaphoreError>(&client).await?;
+        connection.set("test", 2).await?;
+        let result: i32 = connection.get("test").await?;
+        assert_eq!(result, 2);
         Ok(())
     }
 }

@@ -2,27 +2,14 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
-from functools import partial
-from uuid import uuid4
 
 import pytest
 
 from timely import Semaphore
 
-from .conftest import run
+from .conftest import run, semaphore_factory
 
 logger = logging.getLogger(__name__)
-
-
-def semaphore_factory(**kwargs) -> partial:
-    """
-    Provide an almost initialized semaphore with defaults.
-
-    This makes it much easier to init semaphores with slightly different configurations in tests.
-    """
-
-    defaults = {'name': uuid4().hex[:6], 'capacity': 1, 'redis_url': 'redis://127.0.0.1:6389'}
-    return partial(Semaphore, **{**defaults, **kwargs})
 
 
 async def test_semaphore_runtimes():
