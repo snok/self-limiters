@@ -42,6 +42,9 @@ mod tests {
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
     use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
     use redis::{AsyncCommands, Client};
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::Path;
     use std::thread;
     use std::time::Duration;
 
@@ -53,7 +56,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_scheduling() -> TBResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
         let mut scheduled = was_scheduled("test", &mut connection).await?;
         assert_eq!(scheduled, false);
@@ -77,7 +80,7 @@ mod tests {
     /// Make sure the serialization/deserialization actually works.
     #[tokio::test]
     async fn test_write_and_read_data() -> TBResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
 
         let data = Data::new(&0.5, 1);
@@ -115,7 +118,7 @@ mod tests {
 
     #[test]
     fn send_and_receive_via_channel_semaphore_threaded() -> SemResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let queue_key = String::from("test");
         let id = String::from("test");
         let capacity = 1;
@@ -148,7 +151,7 @@ mod tests {
 
     #[test]
     fn send_and_receive_via_channel_token_bucket_threaded() -> TBResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let queue_key = String::from("test");
         let data_key = String::from("test");
         let name = String::from("test");
@@ -189,7 +192,7 @@ mod tests {
 
     #[tokio::test]
     async fn open_client_connection_token_bucket() -> TBResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let mut connection = open_client_connection::<&Client, TokenBucketError>(&client).await?;
         connection.set("test", 1).await?;
         let result: i32 = connection.get("test").await?;
@@ -199,11 +202,39 @@ mod tests {
 
     #[tokio::test]
     async fn open_client_connection_semaphore() -> SemResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389").expect("Failed to connect to Redis");
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
         let mut connection = open_client_connection::<Client, SemaphoreError>(&client).await?;
         connection.set("test", 2).await?;
         let result: i32 = connection.get("test").await?;
         assert_eq!(result, 2);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_lua_script() -> SemResult<()> {
+        let client = Client::open("redis://127.0.0.1:6389").unwrap();
+        let mut connection = open_client_connection::<Client, SemaphoreError>(&client).await?;
+
+        let path = Path::new("src/schedule.lua");
+
+        let mut file = File::open(path).unwrap();
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap();
+
+        let script = redis::Script::new(&content);
+
+        for _ in 0..100 {
+            let result: isize = script
+                .key("test5")
+                .arg(1.to_string()) // capacity
+                .arg(100.to_string()) // refill rate in ms
+                .arg(1.to_string()) // refill amount
+                .invoke_async(&mut connection)
+                .await
+                .expect("something went badly");
+            println!("{:?}", result);
+        }
+
         Ok(())
     }
 }
