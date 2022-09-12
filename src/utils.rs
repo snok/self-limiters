@@ -1,5 +1,8 @@
 use redis::aio::Connection;
-use redis::{Client, RedisError as RedisLibError};
+use redis::{Client, RedisError as RedisLibError, Script};
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 use std::sync::mpsc::{channel, Receiver};
 
 /// Open a channel and send some data
@@ -26,4 +29,12 @@ pub(crate) async fn open_client_connection<T, E: From<RedisLibError>>(
         Ok(connection) => Ok(connection),
         Err(e) => Err(E::from(e)),
     }
+}
+
+pub(crate) fn get_script(path: &str) -> Script {
+    let path = Path::new(path);
+    let mut file = File::open(path).unwrap();
+    let mut content = String::new();
+    file.read_to_string(&mut content).unwrap();
+    Script::new(&content)
 }

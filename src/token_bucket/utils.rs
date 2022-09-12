@@ -1,8 +1,4 @@
 use crate::token_bucket::error::TokenBucketError;
-use redis::Script;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -33,12 +29,4 @@ pub(crate) fn now_millis() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_millis() as u64
-}
-
-pub(crate) fn get_script() -> Script {
-    let path = Path::new("src/schedule.lua");
-    let mut file = File::open(path).unwrap();
-    let mut content = String::new();
-    file.read_to_string(&mut content).unwrap();
-    Script::new(&content)
 }

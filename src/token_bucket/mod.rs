@@ -7,8 +7,9 @@ use pyo3::{PyAny, PyErr, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{parse_redis_url, Client};
 
-use crate::token_bucket::utils::{get_script, now_millis, sleep_for};
-use crate::utils::{open_client_connection, receive_shared_state, send_shared_state};
+use crate::token_bucket::utils::{now_millis, sleep_for};
+use crate::utils::{get_script, open_client_connection, receive_shared_state, send_shared_state};
+use crate::RedisError;
 use error::TokenBucketError;
 
 pub(crate) mod error;
@@ -108,8 +109,8 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        // Return future for the python event loop
         let receiver = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
+
         future_into_py(py, async {
             let ts = receive_shared_state::<ThreadState, TokenBucketError>(receiver)?;
 
@@ -118,15 +119,14 @@ impl TokenBucket {
                 open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
 
             // Retrieve slot
-            let script = get_script();
-            let slot: u64 = script
+            let slot: u64 = get_script("src/schedule.lua")
                 .key(&ts.name)
                 .arg(ts.capacity) // capacity
                 .arg((ts.frequency * 1000.0) as u64) // refill rate in ms
                 .arg(ts.amount) // refill amount
                 .invoke_async(&mut connection)
                 .await
-                .expect("something went badly");
+                .map_err(|e| RedisError::new_err(e.to_string()))?;
 
             let now = now_millis();
             let sleep_duration = {
@@ -147,9 +147,6 @@ impl TokenBucket {
         future_into_py(py, async { Ok(()) })
     }
 
-    /// Create a string representation of the class. Without
-    /// this, the class is printed as builtin.TokenBucket, which
-    /// is pretty confusing.
     fn __repr__(&self) -> String {
         format!("Token bucket instance for queue {}", &self.name)
     }
