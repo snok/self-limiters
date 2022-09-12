@@ -37,10 +37,11 @@ async def test_redis_error():
         # Wait 0.1 seconds then corrupt the queue
         await asyncio.sleep(0.1)
         r = Redis.from_url('redis://127.0.0.1:6389')
+        await r.delete(f'__timely-{name}-queue')
         await r.set(f'__timely-{name}-queue', 'test')
 
     tasks = [asyncio.create_task(corrupt_queue())]
     tasks += [asyncio.create_task(run(semaphore_factory(name=name), 0.1)) for i in range(10)]
 
-    with pytest.raises(RedisError, match='WRONGTYPE: Operation against a key holding the wrong kind of value'):
+    with pytest.raises(RedisError, match='An error was signalled by the server'):
         await asyncio.gather(*tasks)

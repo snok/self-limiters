@@ -13,12 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 async def test_semaphore_runtimes():
-    n = 3
-    sleep = 2
+    n = 10
+    sleep = 0.4
 
     # Ensure n tasks never completed in less the time it would take for n nodes to finish sleeping
     coro = asyncio.wait_for(
-        timeout=n * sleep,
+        timeout=n * sleep - 0.05,
         fut=asyncio.gather(
             *[
                 asyncio.create_task(run(semaphore_factory(name='runtimes', capacity=1), duration=sleep))
@@ -61,10 +61,8 @@ def test_class_attributes():
     semaphore = Semaphore(name='test', capacity=1)
     assert semaphore.queue_key
     assert semaphore.capacity == 1
-    assert round(semaphore.sleep_duration, 1) == 0.1
-    assert semaphore.max_position == 0
 
 
 def test_repr():
     semaphore = Semaphore(name='test', capacity=1)
-    assert re.match(r'Semaphore instance .{10} for queue __timely-test-queue', str(semaphore))  # noqa: W605
+    assert re.match(r'Semaphore instance for queue __timely-test', str(semaphore))  # noqa: W605

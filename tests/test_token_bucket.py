@@ -11,13 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 async def test_token_bucket_runtimes():
-    n = 3
+    n = 10
+    frequency = 0.2
 
     # Ensure n tasks never complete in less than n/(refill_frequency * refill_amount)
     coro = asyncio.wait_for(
-        timeout=n - 0.05,
+        timeout=(frequency * n) - 0.05,
         fut=asyncio.gather(
-            *[asyncio.create_task(run(tokenbucket_factory(name='runtimes', capacity=1), duration=0)) for i in range(n)]
+            *[
+                asyncio.create_task(
+                    run(tokenbucket_factory(name='runtimes', capacity=1, refill_frequency=frequency), duration=0)
+                )
+                for i in range(n)
+            ]
         ),
     )
 
@@ -26,8 +32,13 @@ async def test_token_bucket_runtimes():
 
     # Queue n tasks run no slower than ~0.1 seconds.
     await asyncio.wait_for(
-        timeout=n + 0.05,
-        fut=asyncio.gather(*[asyncio.create_task(run(tokenbucket_factory(capacity=1), duration=0)) for _ in range(n)]),
+        timeout=(frequency * n) + 0.05,
+        fut=asyncio.gather(
+            *[
+                asyncio.create_task(run(tokenbucket_factory(capacity=1, refill_frequency=frequency), duration=0))
+                for _ in range(n)
+            ]
+        ),
     )
 
 
@@ -57,9 +68,8 @@ def test_class_attributes():
     assert tb.capacity == 1
     assert tb.refill_frequency == 1.0
     assert tb.refill_amount == 1
-    assert tb.id
 
 
 def test_repr():
     tb = tokenbucket_factory(name='test', capacity=1)()
-    assert re.match(r'Token bucket instance .{10} for queue __timely-test-queue', str(tb))  # noqa: W605
+    assert re.match(r'Token bucket instance for queue __timely-test', str(tb))  # noqa: W605

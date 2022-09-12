@@ -28,16 +28,13 @@ class Semaphore:
         self,
         name: str,
         capacity: int,
+        max_sleep: Optional[int] = None,  # Set to 0 when None is passed
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
-        sleep_duration: Optional[float] = None,  # will be set as 0.1 if None
-        max_position: Optional[int] = None,  # will be set to 0 if None
     ) -> None: ...
 
     capacity: int
     id: bytes
     queue_key: bytes
-    sleep_duration: float
-    max_position: int
 
     async def __aenter__(self) -> None: ...
     async def __aexit__(
