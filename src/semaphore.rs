@@ -38,7 +38,7 @@ impl ThreadState {
 /// when you can only have 2 active requests simultaneously.
 #[pyclass]
 #[pyo3(name = "Semaphore")]
-#[pyo3(module = "tl")]
+#[pyo3(module = "self_limiters")]
 pub struct Semaphore {
     #[pyo3(get)]
     capacity: u32,
@@ -78,7 +78,7 @@ impl Semaphore {
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Define queue if it doesn't already exist
-            if get_script("src/scripts/rpushnx.lua")
+            if get_script("src/scripts/create_semaphore.lua")
                 .key(&ts.name)
                 .arg(ts.capacity)
                 .invoke_async(&mut connection)
@@ -120,7 +120,7 @@ impl Semaphore {
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Define queue if it doesn't exist
-            get_script("src/scripts/rpushx.lua")
+            get_script("src/scripts/release_semaphore.lua")
                 .key(&ts.name)
                 .invoke_async(&mut connection)
                 .await
