@@ -1,6 +1,6 @@
 <br>
 <p align="center">
-<a href="https://github.com/snok/self-limiters"><img src="docs/logo.svg" width="250px"></a>
+<a href="https://github.com/sondrelg/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
 <b>Distributed async rate limiters for clients</b>
 <br><br>

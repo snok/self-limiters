@@ -6,8 +6,8 @@ authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
 requires-python = ">=3.8"
 license = { file = "LICENSE", type = 'BSD-3' }
-homepage = "https://github.com/snok/self-limiters"
-repository = "https://github.com/snok/self-limiters"
+homepage = "https://github.com/sondrelg/self-limiters"
+repository = "https://github.com/sondrelg/self-limiters"
 keywords = ["distributed", "async", "rate-limit", "rate", "limit", "limiting", "redis", "rust"]
 dependencies = []
 classifiers = [
@@ -25,7 +25,7 @@ classifiers = [
 ]
 
 [project.urls]
-releases = "https://github.com/snok/self-limiters/releases"
+releases = "https://github.com/sondrelg/self-limiters/releases"
 
 [build-system]
 requires = ["maturin>=0.13,<0.14"]
