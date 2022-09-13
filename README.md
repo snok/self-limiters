@@ -2,25 +2,26 @@
 <p align="center">
 <a href="https://github.com/sondrelg/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
-<b>distributed async traffic limiters for clients</b>
+<b>distributed async rate limiters for clients</b>
 <br><br>
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters?label=Release&style=flat-square"></a>
 <a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
 <a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 </p>
+<br>
 
-A self-limiting source produces traffic which never exceeds some upper bound.
-This is helpful when interacting with rate limited resources,
-or to prevent burstiness.
-
-`self-limiters` provides a way to
+This library provides a way to
 police your outgoing traffic with respect to:
 
 - Concurrency, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming))
 - Time, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket)
 
+A self-limiting source produces traffic which never exceeds some upper bound.
+This is useful when interacting with a rate limited resource,
+or to prevent burstiness in traffic, generally.
+
 To use this package, you'll need to be running an `async` stack,
-and have redis available on Python 3.8 or above.
+using Python 3.8 or above, and use redis.
 
 ## Installation
 
@@ -32,10 +33,9 @@ pip install self-limiters
 
 Some parts of the package logic are implemented using Lua scripts, to run
 _on_ the redis instance. This makes it possible to do the same work in one
-request (from the client), that would otherwise take 4. One benefit of this
-is that it eliminates the latency for each request saved. However, the biggest
-benefit is while the lua script is running, our python app event-loop is
-freed up to do other things.
+request (from the client), that would otherwise need `n` requests. Lua scripts
+seems to present the most efficient way to run the required calls, and a
+call to a Lua script is non-blocking.
 
 The flow of the semaphore implementation is:
 - Run [initial script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create semaphore if needed
@@ -64,13 +64,14 @@ but is opportunistic. A worker will not be allowed to run until there
 is capacity assigned to them, specifically; but the order of execution
 is not guaranteed to be exactly FIFO.
 
-The flow goes roughly like this:
-
-<img width=800 heigh=800 src="docs/semaphore.png"></img>
-
 <details>
 <summary><b>Flow breakdown</b></summary>
-<ol>
+<ul>
+
+<div align="center">
+    <img width=500 heigh=500 src="docs/semaphore.png"></img>
+</div>
+
 <li>
 
 The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) will call [`SETNX`](https://redis.io/commands/setnx/) on the name of the
@@ -103,7 +104,7 @@ the capacity might never be returned. If, however, there is no one using the sem
 expiry value, all values will be cleared, and the semaphore will be recreated at full capacity next time it's used.
 The expiry is 30 seconds at the time of writing, but could be made configurable.
 </li>
-</ol>
+</ul>
 </details>
 
 ### Usage
@@ -135,13 +136,12 @@ The implementation is forward-looking. It works out the time there *would have b
 capacity in the bucket for a given client and returns that time. From there we can
 asynchronously sleep until it's time to perform our rate limited action.
 
-The code flow goes:
-
-<img width=800 heigh=800 src="docs/token_bucket.png"></img>
-
 <details>
 <summary><b>Flow breakdown</b></summary>
-<ol>
+<ul>
+
+<img align=center width=500 src="docs/token_bucket.png"></img>
+
 <li>
 
 The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua)
@@ -164,7 +164,7 @@ so Lua scripts on Redis are FIFO. Without this we would need locks and a lot mor
 
 Then we just sleep!
 </li>
-</ol>
+</ul>
 </details>
 
 
