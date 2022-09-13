@@ -13,7 +13,7 @@ mod _utils;
 mod token_bucket;
 
 #[pymodule]
-fn tl(py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
     m.add(
         "MaxSleepExceededError",
