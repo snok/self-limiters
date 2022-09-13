@@ -1,5 +1,5 @@
 # Stolen and adapted from https://github.com/pydantic/pydantic-core/blob/main/.github/workflows/ci.yml
-name: Release
+name: release
 
 on:
   release:
