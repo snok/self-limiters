@@ -2,6 +2,7 @@
 name = "timely"
 version = "0.1.0"
 edition = "2021"
+include = ["/src"]
 
 [lib]
 name = "timely"
@@ -19,4 +20,3 @@ redis = { version="^0.21.5", features = ["aio", "tokio-comp"] }
 redlock = { version="1.2.0", features = ["tokio", "async"] }
 log = "0.4.17"
 pyo3-log = "^0.6.0"
-nanoid = "^0.4.0"

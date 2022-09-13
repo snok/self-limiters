@@ -19,17 +19,15 @@ async def _consume(name):
     async with Semaphore(
         name=name,
         capacity=1,
-        max_position=100,
+        max_sleep=0,
         redis_url='redis://127.0.0.1:6389',
-        sleep_duration=0.1,
     ):
-        await asyncio.sleep(1.5)
-        # pass
+        await asyncio.sleep(0.1)
 
 
 async def main():
     name = uuid4().hex[:6]
-    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(4)])
+    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(100)])
 
 
 start = datetime.now()

@@ -3,17 +3,16 @@ use std::time::Duration;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
-use pyo3::{PyAny, PyErr, PyResult, Python};
+use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
-use redis::{parse_redis_url, Client};
+use redis::Client;
 
-use crate::token_bucket::utils::{now_millis, sleep_for};
-use crate::utils::{get_script, open_client_connection, receive_shared_state, send_shared_state};
 use crate::RedisError;
-use error::TokenBucketError;
-
-pub(crate) mod error;
-pub(crate) mod utils;
+use crate::_errors::TLError;
+use crate::_utils::{
+    get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
+    validate_redis_url, TLResult,
+};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
@@ -37,6 +36,25 @@ impl ThreadState {
             name: slf.name.clone(),
         }
     }
+}
+
+pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResult<()> {
+    if max_sleep.as_secs_f32() > 0.0 && sleep_duration > max_sleep {
+        return Err(TLError::MaxSleepExceeded(format!(
+            "Sleep duration {} exceeds max sleep {}",
+            sleep_duration.as_secs(),
+            max_sleep.as_secs()
+        )));
+    }
+    let ms = sleep_duration.as_millis();
+
+    if ms < 5 {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    } else {
+        tokio::time::sleep(sleep_duration).await;
+    }
+
+    Ok(())
 }
 
 #[pyclass]
@@ -67,24 +85,6 @@ impl TokenBucket {
         redis_url: Option<&str>,
         max_sleep: Option<f64>,
     ) -> PyResult<Self> {
-        let url = match parse_redis_url(redis_url.unwrap_or("redis://127.0.0.1:6379")) {
-            Some(url) => url,
-            None => {
-                return Err(PyErr::from(TokenBucketError::Redis(String::from(
-                    "Failed to parse redis url",
-                ))));
-            }
-        };
-        let client = match Client::open(url) {
-            Ok(client) => client,
-            Err(e) => {
-                return Err(PyErr::from(TokenBucketError::Redis(format!(
-                    "Failed to connect to redis: {}",
-                    e
-                ))));
-            }
-        };
-
         if refill_frequency <= 0.0 {
             return Err(PyValueError::new_err(
                 "Refill frequency must be greater than 0",
@@ -97,11 +97,11 @@ impl TokenBucket {
         }
         Ok(Self {
             capacity: capacity as u32,
-            client,
             refill_amount: refill_amount as u32,
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
             name: format!("__timely-{}", name),
+            client: validate_redis_url(redis_url)?,
         })
     }
 
@@ -109,17 +109,16 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, TokenBucketError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState, TLError>(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, TokenBucketError>(receiver)?;
+            let ts = receive_shared_state::<ThreadState, TLError>(receiver)?;
 
             // Connect to redis
-            let mut connection =
-                open_client_connection::<&Client, TokenBucketError>(&ts.client).await?;
+            let mut connection = open_client_connection(&ts.client).await?;
 
             // Retrieve slot
-            let slot: u64 = get_script("src/schedule.lua")
+            let slot: u64 = get_script("src/scripts/schedule.lua")
                 .key(&ts.name)
                 .arg(ts.capacity) // capacity
                 .arg((ts.frequency * 1000.0) as u64) // refill rate in ms

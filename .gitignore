@@ -72,3 +72,5 @@ docs/_build/
 .python-version
 
 ARGO_LLVM_COV_TARGET_DIR
+
+.env

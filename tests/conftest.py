@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import os
 from functools import partial
+from pathlib import Path
 from uuid import uuid4
 
 import pytest as pytest
@@ -11,6 +13,13 @@ from timely import Semaphore, TokenBucket
 uvloop.install()
 
 logger = logging.getLogger(__name__)
+
+REPO_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture(autouse=True)
+def _change_test_dir():
+    os.chdir(REPO_ROOT)
 
 
 @pytest.fixture(autouse=True, scope='session')
