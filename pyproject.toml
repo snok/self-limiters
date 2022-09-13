@@ -1,6 +1,6 @@
 [project]
 name = "self-limiters"
-version = "0.0.1"
+version = "0.0.6"
 description = "Provdes distributed async client rate limiters for using Redis"
 authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
