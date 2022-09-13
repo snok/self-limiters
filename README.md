@@ -2,8 +2,7 @@
 <p align="center">
 <a href="https://github.com/snok/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
-<b>Distributed async rate limiters</b><br>
-<b>for your clients</b>
+<b>Distributed async rate limiters for clients</b>
 <br><br>
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters?label=Release&style=flat-square"></a>
 <a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
@@ -11,16 +10,17 @@
 </p>
 <br>
 
-> A self-limiting source produces traffic which never exceeds some upper bound
+A self-limiting source produces traffic which never exceeds some upper bound.
+This is important when interacting with rate limited resources,
+or to prevent burstiness.
+`self-limiters` provides a way to police your outgoing traffic
+with respect to:
 
-This library provides client rate limiters for async python apps with access to a redis instance.
+- Concurrency, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming))
+- Time, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket)
 
-The scope of the library is pretty small. All it does is provide a way to police traffic for:
-
-- Concurrency based limits, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming)) (e.g., `n` allowed requests at once)
-- Time based limits, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (e.g., `n` allowed requests per minute)
-
-While this was written with request rate limiting as the intended use, the implementations can be used for anything.
+To use this package, you'll need to be running an `async` stack,
+and have redis available on Python 3.8 or above.
 
 ## Installation
 
@@ -30,11 +30,11 @@ pip install self-limiters
 
 ## Performance considerations
 
-Some parts of the package logic are implemented using Lua scripts, to run 
-_on_ the redis instance. This makes it possible to do the same work in one 
-request (from the client), that would otherwise take 4. One benefit of this 
+Some parts of the package logic are implemented using Lua scripts, to run
+_on_ the redis instance. This makes it possible to do the same work in one
+request (from the client), that would otherwise take 4. One benefit of this
 is that it eliminates the latency for each request saved. However, the biggest
-benefit is while the lua script is running, our python app event-loop is 
+benefit is while the lua script is running, our python app event-loop is
 freed up to do other things.
 
 The flow of the semaphore implementation is:
@@ -55,13 +55,13 @@ In other words, the limiters' impact on the application event-loop should be neg
 ## The semaphore implementation
 
 The semaphore implementation is useful when you need to limit a process
-to `n` concurrent actions. For example if you have 10 web servers, and 
-you're interacting with an API that will only tolerate 5 concurrent 
+to `n` concurrent actions. For example if you have 10 web servers, and
+you're interacting with an API that will only tolerate 5 concurrent
 requests before locking you out.
 
-In terms of fairness, the semaphore implementation skews towards FIFO, 
-but is opportunistic. A worker will not be allowed to run until there 
-is capacity assigned to them, specifically; but the order of execution 
+In terms of fairness, the semaphore implementation skews towards FIFO,
+but is opportunistic. A worker will not be allowed to run until there
+is capacity assigned to them, specifically; but the order of execution
 is not guaranteed to be exactly FIFO.
 
 The flow goes roughly like this:
@@ -73,8 +73,8 @@ The flow goes roughly like this:
 <ol>
 <li>
 
-The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) will call [`SETNX`](https://redis.io/commands/setnx/) on the name of the 
-queue plus a postfix. If the returned value is 1 it means the queue we will use for our 
+The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) will call [`SETNX`](https://redis.io/commands/setnx/) on the name of the
+queue plus a postfix. If the returned value is 1 it means the queue we will use for our
 semaphore does not exist yet and needs to be created.
 
 (It might strike you as weird to have a separate entry for indicating whether the list
@@ -96,9 +96,9 @@ semaphore instance setting. If nothing was passed we allow sleeping forever.
 <li>
 
 On `__aexit__` we call another script to [`RPUSH`](https://redis.io/commands/rpush/) a `1` value back into the queue
-and set an expiry on the queue and the value we called `SETNX` on. 
+and set an expiry on the queue and the value we called `SETNX` on.
 
-The expires are a half measure for dealing with dropped capacity. If a node holding the semaphore dies, 
+The expires are a half measure for dealing with dropped capacity. If a node holding the semaphore dies,
 the capacity might never be returned. If, however, there is no one using the semaphore for the duration of the
 expiry value, all values will be cleared, and the semaphore will be recreated at full capacity next time it's used.
 The expiry is 30 seconds at the time of writing, but could be made configurable.
@@ -128,11 +128,11 @@ while True:
 
 ## The token bucket implementation
 
-The token bucket implementation is useful when you need to limit a process to a 
+The token bucket implementation is useful when you need to limit a process to a
 certain number of actions per unit of time. For example, 1 request per minute.
 
-The implementation is forward-looking. It works out the time there *would have been* 
-capacity in the bucket for a given client and returns that time. From there we can 
+The implementation is forward-looking. It works out the time there *would have been*
+capacity in the bucket for a given client and returns that time. From there we can
 asynchronously sleep until it's time to perform our rate limited action.
 
 The code flow goes:
@@ -144,13 +144,13 @@ The code flow goes:
 <ol>
 <li>
 
-The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) 
-first [`GET`](https://redis.io/commands/get/)s the state of the bucket. That means, the last slot 
+The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua)
+first [`GET`](https://redis.io/commands/get/)s the state of the bucket. That means, the last slot
 that was scheduled and the number of tokens left for that slot. With a capacity of 1,
 having a `tokens_left_for_slot` variable makes no sense, but if there's capacity of 2 or more,
 it is possible that we will need to schedule multiple clients on the same slot.
 
-The script then works out whether to decrement the `tokens_left_for_slot` value, or to 
+The script then works out whether to decrement the `tokens_left_for_slot` value, or to
 increment the slot value wrt. the frequency variable.
 
 Finally, we store the bucket state again using [`SETEX`](https://redis.io/commands/setex/).
