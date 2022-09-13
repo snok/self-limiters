@@ -1,11 +1,11 @@
 [package]
-name = "tl"
+name = "self-limiters"
 version = "0.0.1"
 edition = "2021"
 include = ["/src"]
 
 [lib]
-name = "tl"
+name = "self_limiters"
 crate-type = ["cdylib"]
 
 [features]

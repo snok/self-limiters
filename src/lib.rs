@@ -15,18 +15,12 @@ mod token_bucket;
 #[pymodule]
 fn tl(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
-
-    // Add exceptions
     m.add(
         "MaxSleepExceededError",
         py.get_type::<MaxSleepExceededError>(),
     )?;
     m.add("RedisError", py.get_type::<RedisError>())?;
-
-    // Add semaphore resources
     m.add_class::<Semaphore>()?;
-
-    // Add token bucket resources
     m.add_class::<TokenBucket>()?;
 
     Ok(())

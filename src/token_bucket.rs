@@ -63,7 +63,7 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResul
 /// of that nature.
 #[pyclass]
 #[pyo3(name = "TokenBucket")]
-#[pyo3(module = "tl")]
+#[pyo3(module = "self_limiters")]
 pub struct TokenBucket {
     #[pyo3(get)]
     capacity: u32,

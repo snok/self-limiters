@@ -1,12 +1,12 @@
 <br>
 <p align="center">
-<a href="https://github.com/snok/traffic-lights"><img src="docs/logo.svg" width="250px"></a>
+<a href="https://github.com/snok/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
 <b>Distributed async rate limiters</b>
 <br><br>
-<a href="https://pypi.org/project/traffic-lights/"><img alt="PyPI" src="https://img.shields.io/pypi/v/traffic-lights?label=Release&style=flat-square"></a>
-<a href="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml/badge.svg"></a>
-<a href="https://codecov.io/gh/sondrelg/traffic-lights/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/traffic-lights/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+<a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters?label=Release&style=flat-square"></a>
+<a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
+<a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 </p>
 
 

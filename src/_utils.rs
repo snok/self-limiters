@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type TLResult<T> = Result<T, TLError>;
 
 const REDIS_DEFAULT_URL: &str = "redis://127.0.0.1:6379";
-pub(crate) const REDIS_KEY_PREFIX: &str = "__traffic-lights-";
+pub(crate) const REDIS_KEY_PREFIX: &str = "__self-limiters-";
 
 /// Open a channel and send some data
 pub(crate) fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
