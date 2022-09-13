@@ -11,7 +11,7 @@ use crate::RedisError;
 use crate::_errors::TLError;
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url, TLResult,
+    validate_redis_url, TLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -57,6 +57,10 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResul
     Ok(())
 }
 
+/// Async context manager useful for enforcing police client traffic
+/// when dealing with a time-based external rate limit. For example,
+/// when you can only send 1 request per minute, or another variation
+/// of that nature.
 #[pyclass]
 #[pyo3(name = "TokenBucket")]
 #[pyo3(module = "tl")]
@@ -100,7 +104,7 @@ impl TokenBucket {
             refill_amount: refill_amount as u32,
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
-            name: format!("traffic-lights-{}", name),
+            name: format!("{}{}", REDIS_KEY_PREFIX, name),
             client: validate_redis_url(redis_url)?,
         })
     }
