@@ -11,10 +11,11 @@
 <br>
 
 A self-limiting source produces traffic which never exceeds some upper bound.
-This is important when interacting with rate limited resources,
+This is helpful when interacting with rate limited resources,
 or to prevent burstiness.
-`self-limiters` provides a way to police your outgoing traffic
-with respect to:
+
+`self-limiters` provides a way to
+police your outgoing traffic with respect to:
 
 - Concurrency, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming))
 - Time, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket)
