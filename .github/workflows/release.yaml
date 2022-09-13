@@ -91,19 +91,6 @@ jobs:
           name: pypi_files
           path: dist
 
-  list-pypi-files:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: get dist artifacts
-        uses: actions/download-artifact@v3
-        with:
-          name: pypi_files
-          path: dist
-      - run: ls -lh dist/
-      - run: echo "`ls dist | wc -l` files"
-
   release:
     needs: [build]
     runs-on: ubuntu-latest
