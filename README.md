@@ -5,8 +5,8 @@
 <b>Distributed async rate limiters</b>
 <br><br>
 <a href="https://pypi.org/project/traffic-lights/"><img alt="PyPI" src="https://img.shields.io/pypi/v/traffic-lights?label=Release&style=flat-square"></a>
-<a href="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml"><img alt="PyPI" src="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml/badge.svg"></a>
-<a href="https://codecov.io/gh/sondrelg/traffic-lights/"><img alt="PyPI" src="https://codecov.io/gh/sondrelg/traffic-lights/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+<a href="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml/badge.svg"></a>
+<a href="https://codecov.io/gh/sondrelg/traffic-lights/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/traffic-lights/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 </p>
 
 
