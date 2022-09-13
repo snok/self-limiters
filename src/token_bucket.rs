@@ -59,7 +59,7 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResul
 
 #[pyclass]
 #[pyo3(name = "TokenBucket")]
-#[pyo3(module = "timely")]
+#[pyo3(module = "tl")]
 pub struct TokenBucket {
     #[pyo3(get)]
     capacity: u32,
@@ -100,7 +100,7 @@ impl TokenBucket {
             refill_amount: refill_amount as u32,
             refill_frequency,
             max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
-            name: format!("__timely-{}", name),
+            name: format!("traffic-lights-{}", name),
             client: validate_redis_url(redis_url)?,
         })
     }

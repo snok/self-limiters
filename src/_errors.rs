@@ -7,14 +7,12 @@ use std::string::FromUtf8Error;
 use std::sync::mpsc::{RecvError, SendError};
 use tokio::task::JoinError;
 
-// Exception to return in place of redis::RedisError
-// PyErr instances are raised as Python exceptions by pyo3, while
-// native rust errors result in panics.
-create_exception!(timely, RedisError, PyException);
+// Raised when redis::RedisError is raised downstream.
+create_exception!(tl, RedisError, PyException);
 
-// Exception to raise when we've slept for too long.
-// Useful to catch forever-growing queues, etc.
-create_exception!(timely, MaxSleepExceededError, PyException);
+// Raised when we've slept for too long.
+// Useful to catch forever-growing queues.
+create_exception!(tl, MaxSleepExceededError, PyException);
 
 /// Enum containing all handled errors.
 #[derive(Debug)]

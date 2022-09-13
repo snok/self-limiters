@@ -12,11 +12,10 @@ class TokenBucket:
         max_sleep: Optional[float] = None,  # will be set to 0 if None
     ) -> None: ...
 
-    name: str
     capacity: int
+    name: str
     refill_frequency: float
     refill_amount: int
-    redis_url: str
 
     async def __aenter__(self) -> None: ...
     async def __aexit__(
@@ -33,8 +32,8 @@ class Semaphore:
     ) -> None: ...
 
     capacity: int
-    id: bytes
     queue_key: bytes
+    max_sleep: int
 
     async def __aenter__(self) -> None: ...
     async def __aexit__(
@@ -44,4 +43,15 @@ class Semaphore:
 __all__: list[str]
 
 class RedisError(Exception):
+    """
+    Raised when the downstream redis library raises any exception.
+    """
+
+    pass
+
+class MaxSleepExceededError(Exception):
+    """
+    Raised when we've slept for longer than the `max_sleep` specified limit.
+    """
+
     pass

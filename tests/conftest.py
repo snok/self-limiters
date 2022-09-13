@@ -7,8 +7,7 @@ from uuid import uuid4
 
 import pytest as pytest
 import uvloop
-
-from timely import Semaphore, TokenBucket
+from tl import Semaphore, TokenBucket
 
 uvloop.install()
 

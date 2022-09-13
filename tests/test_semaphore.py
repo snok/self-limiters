@@ -64,4 +64,4 @@ def test_class_attributes():
 
 def test_repr():
     semaphore = Semaphore(name='test', capacity=1)
-    assert re.match(r'Semaphore instance for queue __timely-test', str(semaphore))  # noqa: W605
+    assert re.match(r'Semaphore instance for queue __traffic-lights-test', str(semaphore))  # noqa: W605

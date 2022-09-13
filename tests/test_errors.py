@@ -4,8 +4,7 @@ from uuid import uuid4
 
 import pytest
 from redis.asyncio.client import Redis
-
-from timely import RedisError
+from tl import RedisError
 
 from .conftest import run, semaphore_factory, tokenbucket_factory
 
@@ -14,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def test_redis_error_on_init():
     """
-    Make sure redis errors in the redis crate are propagated as timely.RedisError.
+    Make sure redis errors in the redis crate are propagated as tl.RedisError.
 
     Test failure to parse connection string.
     """
@@ -27,7 +26,7 @@ async def test_redis_error_on_init():
 
 async def test_redis_error():
     """
-    Make sure redis errors in the redis crate are propagated as timely.RedisError.
+    Make sure redis errors in the redis crate are propagated as tl.RedisError.
 
     Test failed redis operation in the main semaphore flow.
     """
@@ -37,8 +36,8 @@ async def test_redis_error():
         # Wait 0.1 seconds then corrupt the queue
         await asyncio.sleep(0.1)
         r = Redis.from_url('redis://127.0.0.1:6389')
-        await r.delete(f'__timely-{name}-queue')
-        await r.set(f'__timely-{name}-queue', 'test')
+        await r.delete(f'__traffic-lights-{name}-queue')
+        await r.set(f'__traffic-lights-{name}-queue', 'test')
 
     tasks = [asyncio.create_task(corrupt_queue())]
     tasks += [asyncio.create_task(run(semaphore_factory(name=name), 0.1)) for i in range(10)]

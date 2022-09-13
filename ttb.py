@@ -12,7 +12,7 @@ logging.basicConfig(level='DEBUG', format=log_format)
 # Build and install
 import_hook.install(bindings='pyo3')
 
-from timely import TokenBucket  # noqa
+from tl import TokenBucket  # noqa
 
 
 async def _consume(name):
@@ -30,7 +30,6 @@ async def _consume(name):
 async def main():
     name = uuid4().hex[:6]
     await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(99)])
-    print('FINISHED ALL')  # noqa
 
 
 start = datetime.now()
