@@ -17,7 +17,7 @@ async def test_semaphore_runtimes():
 
     # Ensure n tasks never completed in less the time it would take for n nodes to finish sleeping
     coro = asyncio.wait_for(
-        timeout=n * sleep - 0.05,
+        timeout=n * sleep,
         fut=asyncio.gather(
             *[
                 asyncio.create_task(run(semaphore_factory(name='runtimes', capacity=1), duration=sleep))
@@ -31,7 +31,7 @@ async def test_semaphore_runtimes():
 
     # Queue n tasks run no slower than ~0.1 seconds.
     await asyncio.wait_for(
-        timeout=n * sleep * 1.1,
+        timeout=n * sleep * 1.05,
         fut=asyncio.gather(
             *[asyncio.create_task(run(semaphore_factory(capacity=1), duration=sleep)) for _ in range(n)]
         ),
@@ -58,7 +58,7 @@ def test_class_attributes():
     Check attributes are accessible, and check defaults.
     """
     semaphore = Semaphore(name='test', capacity=1)
-    assert semaphore.queue_key
+    assert semaphore.name
     assert semaphore.capacity == 1
 
 

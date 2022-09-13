@@ -31,16 +31,17 @@ async def test_redis_error():
     Test failed redis operation in the main semaphore flow.
     """
     name = f'error-test-{uuid4()}'
+    queue_name = f'__traffic-lights-{name}'
 
     async def corrupt_queue():
         # Wait 0.1 seconds then corrupt the queue
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.3)
         r = Redis.from_url('redis://127.0.0.1:6389')
-        await r.delete(f'__traffic-lights-{name}-queue')
-        await r.set(f'__traffic-lights-{name}-queue', 'test')
+        await r.delete(queue_name)
+        await r.set(queue_name, 'test')
 
     tasks = [asyncio.create_task(corrupt_queue())]
-    tasks += [asyncio.create_task(run(semaphore_factory(name=name), 0.1)) for i in range(10)]
+    tasks += [asyncio.create_task(run(semaphore_factory(name=name), 0.1)) for _ in range(10)]
 
-    with pytest.raises(RedisError, match='An error was signalled by the server'):
+    with pytest.raises(RedisError):
         await asyncio.gather(*tasks)
