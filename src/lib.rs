@@ -13,7 +13,7 @@ mod _utils;
 mod token_bucket;
 
 #[pymodule]
-fn timely(py: Python<'_>, m: &PyModule) -> PyResult<()> {
+fn tl(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     pyo3_log::init();
 
     // Add exceptions

@@ -12,7 +12,7 @@ logging.basicConfig(level='DEBUG', format=log_format)
 # Build and install
 import_hook.install(bindings='pyo3')
 
-from timely import Semaphore  # noqa
+from tl import Semaphore  # noqa
 
 
 async def _consume(name):
