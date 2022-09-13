@@ -130,4 +130,8 @@ impl Semaphore {
             Ok(())
         })
     }
+
+    fn __repr__(&self) -> String {
+        format!("Semaphore instance for queue {}", &self.name)
+    }
 }
