@@ -2,47 +2,67 @@
 <p align="center">
 <a href="https://github.com/snok/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
-<b>Distributed async rate limiters</b>
+<b>Distributed async rate limiters</b><br>
+<b>for your clients</b>
 <br><br>
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters?label=Release&style=flat-square"></a>
 <a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
 <a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 </p>
-
-
-
 <br>
 
-> This is currently a work in progress.
+> A self-limiting source produces traffic which never exceeds some upper bound
 
-Traffic lights is a library for client rate limiting. More specifically, it's a project for rate limiting your
-Python applications if you're running an async stack and redis.
+This library provides client rate limiters for async python apps with access to a redis instance.
 
 The scope of the library is pretty small. All it does is provide a way to police traffic for:
 
-- Concurrency based limits, using a distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)) (e.g., `n` allowed requests at once)
+- Concurrency based limits, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming)) (e.g., `n` allowed requests at once)
 - Time based limits, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket) (e.g., `n` allowed requests per minute)
 
-Parts of the logic are implemented using Lua scripts, run _on_ the redis instance.
-This makes it possible to do the same work in one request, that would otherwise take 4. This eliminates the latency
-of each request we've saved, while letting us free up the event-loop to do other things for the duration.
-The overhead if both rate limiters should in other words be completely negligible :rocket:
+While this was written with request rate limiting as the intended use, the implementations can be used for anything.
 
 ## Installation
 
 ```bash
-pip install traffic-lights
+pip install self-limiters
 ```
+
+## Performance considerations
+
+Some parts of the package logic are implemented using Lua scripts, to run 
+_on_ the redis instance. This makes it possible to do the same work in one 
+request (from the client), that would otherwise take 4. One benefit of this 
+is that it eliminates the latency for each request saved. However, the biggest
+benefit is while the lua script is running, our python app event-loop is 
+freed up to do other things.
+
+The flow of the semaphore implementation is:
+- Run [initial script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create semaphore if needed
+- Run [`BLPOP`](https://redis.io/commands/blpop/) to wait for the semaphore to return
+- Run [script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back capacity
+
+All of these are non-blocking.
+
+The flow for the token bucket implementation is:
+- Run initial script to retrieve a wake-up time
+- Sleep asynchronously until the wake-up time
+
+Both of these are also non-blocking.
+
+In other words, the limiters' impact on the application event-loop should be negligible.
 
 ## The semaphore implementation
 
 The semaphore implementation is useful when you need to limit a process
-to `n` actions at the same time.
+to `n` concurrent actions. For example if you have 10 web servers, and 
+you're interacting with an API that will only tolerate 5 concurrent 
+requests before locking you out.
 
-In terms of fairness, the semaphore implementation skews towards
-FIFO, but is opportunistic. A worker will not be allowed to run until
-there is capacity assigned to them, specifically; but the order of
-execution is not guaranteed to be exactly FIFO.
+In terms of fairness, the semaphore implementation skews towards FIFO, 
+but is opportunistic. A worker will not be allowed to run until there 
+is capacity assigned to them, specifically; but the order of execution 
+is not guaranteed to be exactly FIFO.
 
 The flow goes roughly like this:
 
@@ -51,27 +71,37 @@ The flow goes roughly like this:
 <details>
 <summary><b>Flow breakdown</b></summary>
 <ol>
-<li>Enter queue (<a href="https://redis.io/commands/rpush/">RPUSH</a>*) and get the queue position.
+<li>
 
-*<small>When using RPUSH, <a href="https://redis.io/commands/lpos/">LPOS</a> will find the first index at O(1),
-and the second at O(2), and so on. By using this combination, we're prioritizing quicker access at lower indexes.</small>
-</li>
-<li>
-How long to sleep for depends on our position in the queue. If the capacity of the semaphore is 10, and we are position 15,
-then we need 5 places to be freed up before it's our turn. In this case, we sleep 5 * `sleep_duration`, which is 100ms
-by default and can be specified when instantiating the Semaphore class.
-</li>
-<li>
-Check our position (<a href="https://redis.io/commands/lpos/">LPOS</a>) and raise an error if the position exceeds
-the maximum allowed position (none, by default).
-</li>
-<li>
-After running the rate limited code, we need to clean up the queue entry we added.
-We could use a distributed lock to check our position and pop the right index, but that seems needlessly inefficient. Instead, we
-just pop the first index, since this will free up capacity in the semaphore for the next process.
+The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) will call [`SETNX`](https://redis.io/commands/setnx/) on the name of the 
+queue plus a postfix. If the returned value is 1 it means the queue we will use for our 
+semaphore does not exist yet and needs to be created.
 
-There is a potential issue where capacity will never be freed if a process crashes before running aexit. To remedy
-this slightly, we specify that the queue should expire after a short period of inactivity.
+(It might strike you as weird to have a separate entry for indicating whether the list
+should be created or not. It would be great if we could use [`EXISTS`](https://redis.io/commands/exists/)
+on the list directly instead, but a list is deleted when all elements are popped, so I don't see
+another way of achieving this. Contributions are welcome if you do.)
+</li>
+<li>
+
+If the queue needs to be created we call [`RPUSH`](https://redis.io/commands/rpush/) with the number of arguments
+equal to the `capacity` value used when initializing the semaphore instance.
+</li>
+<li>
+
+Once the queue has been created, we call [`BLPOP`](https://redis.io/commands/blpop/) to block until it's
+our turn. `BLPOP` is FIFO by default. We also make sure to specify the `max_sleep` based on the initialized
+semaphore instance setting. If nothing was passed we allow sleeping forever.
+</li>
+<li>
+
+On `__aexit__` we call another script to [`RPUSH`](https://redis.io/commands/rpush/) a `1` value back into the queue
+and set an expiry on the queue and the value we called `SETNX` on. 
+
+The expires are a half measure for dealing with dropped capacity. If a node holding the semaphore dies, 
+the capacity might never be returned. If, however, there is no one using the semaphore for the duration of the
+expiry value, all values will be cleared, and the semaphore will be recreated at full capacity next time it's used.
+The expiry is 30 seconds at the time of writing, but could be made configurable.
 </li>
 </ol>
 </details>
@@ -81,11 +111,11 @@ this slightly, we specify that the queue should expire after a short period of i
 The utility is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
 
 ```python
-from tl import Semaphore
+from self_limiters import semaphore
 
 
 # Instantiate a semaphore that will allow 10 concurrent requests
-concurrency_limited_queue = Semaphore(
+concurrency_limited_queue = semaphore(
     name="unique-resource-name",
     capacity=10,
     redis_url="redis://localhost:6379"
@@ -98,29 +128,53 @@ while True:
 
 ## The token bucket implementation
 
-The token bucket implementation is useful when you need to limit a
-process to a certain number of actions per unit of time. For
-example, 1 request per minute.
+The token bucket implementation is useful when you need to limit a process to a 
+certain number of actions per unit of time. For example, 1 request per minute.
 
-This implementation, unlike the semaphore algorithm, does not rely on continuous polling to see whether there is
-capacity or not. Instead, we let a scheduler process work out *when* a token would have been added for each node
-in the queue, and let the nodes sleep until it's time to consume their token. The aim is to minimize i/o and maximize
-sleep, as sleeping asynchronously frees up the event loop to do other things.
+The implementation is forward-looking. It works out the time there *would have been* 
+capacity in the bucket for a given client and returns that time. From there we can 
+asynchronously sleep until it's time to perform our rate limited action.
 
 The code flow goes:
 
 <img width=800 heigh=800 src="docs/token_bucket.png"></img>
 
-By implementing parts of the logic in a [Lua](https://www.lua.org/) script, we're able to get great
-performance, and reduce i/o. Since redis is single-threaded, scripts are considered atomic,
-which also reduces complexity greatly.
+<details>
+<summary><b>Flow breakdown</b></summary>
+<ol>
+<li>
+
+The [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) 
+first [`GET`](https://redis.io/commands/get/)s the state of the bucket. That means, the last slot 
+that was scheduled and the number of tokens left for that slot. With a capacity of 1,
+having a `tokens_left_for_slot` variable makes no sense, but if there's capacity of 2 or more,
+it is possible that we will need to schedule multiple clients on the same slot.
+
+The script then works out whether to decrement the `tokens_left_for_slot` value, or to 
+increment the slot value wrt. the frequency variable.
+
+Finally, we store the bucket state again using [`SETEX`](https://redis.io/commands/setex/).
+This allows us to store the state and set expiry at the same time. The default expiry
+is 30 at the time of writing, but could be made configurable.
+
+One thing to note, is that this would not work if it wasn't for the fact that redis is single threaded,
+so Lua scripts on Redis are FIFO. Without this we would need locks and a lot more logic.
+</li>
+<li>
+
+Then we just sleep!
+</li>
+</ol>
+</details>
+
+
 
 ### Usage
 
 This is also implemented as a context manager in Python and can be used roughly as follows:
 
 ```python
-from tl import TokenBucket
+from self_limiters import TokenBucket
 
 # Instantiate a bucket that will allow 10 requests per minute
 time_limited_queue = TokenBucket(
