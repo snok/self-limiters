@@ -1,15 +1,17 @@
 [project]
 name = "tl"
-version = "0.1.0"
-description = "Distributed async rate-limiting algorithms"
+version = "0.0.1"
+description = "Provdes distributed async client rate limiters for using Redis"
 authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
+requires-python = ">=3.8"
 license = { file = "LICENSE", type = 'BSD-3' }
 homepage = "https://github.com/snok/traffic-lights"
 repository = "https://github.com/snok/traffic-lights"
 keywords = ["distributed", "async", "rate-limit", "rate", "limit", "limiting", "redis", "rust"]
-requires-python = ">=3.8"
+dependencies = []
 classifiers = [
+    "Development Status :: 3 - Alpha",
     "Programming Language :: Rust",
     'Programming Language :: Python',
     'Programming Language :: Python :: 3.8',

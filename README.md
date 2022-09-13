@@ -156,4 +156,3 @@ Assuming you have a redis server running at `:6389` you can debug
 a lua script by calling `redis-cli -u redis://127.0.0.1:6389 --ldb --eval src/semaphore/rpushnx.lua x 1`.
 
 Just type `help` in the debugger for options.
-
