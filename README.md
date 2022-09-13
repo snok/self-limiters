@@ -197,8 +197,8 @@ while True:
 
 When testing locally:
 
-- processing 100 nodes with the semaphore implementation takes ~13ms
-- processing 100 nodes with the token bucket implementation takes ~7ms
+- processing 100 nodes with the semaphore implementation takes ~6ms
+- processing 100 nodes with the token bucket implementation takes ~4ms
 
 <img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
 
