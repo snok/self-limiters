@@ -10,14 +10,14 @@ use redis::{AsyncCommands, Client};
 
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url,
+    validate_redis_url, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
 pub(crate) struct ThreadState {
     pub(crate) client: Client,
-    pub(crate) queue_key: String,
+    pub(crate) name: String,
     pub(crate) capacity: u32,
     pub(crate) max_sleep: u32,
 }
@@ -25,7 +25,7 @@ pub(crate) struct ThreadState {
 impl ThreadState {
     fn from(slf: &PyRef<Semaphore>) -> ThreadState {
         ThreadState {
-            queue_key: slf.queue_key.clone(),
+            name: slf.name.clone(),
             capacity: slf.capacity,
             client: slf.client.clone(),
             max_sleep: slf.max_sleep,
@@ -43,7 +43,7 @@ pub struct Semaphore {
     #[pyo3(get)]
     capacity: u32,
     #[pyo3(get)]
-    queue_key: String,
+    name: String,
     #[pyo3(get)]
     max_sleep: u32,
     client: Client,
@@ -61,7 +61,7 @@ impl Semaphore {
     ) -> PyResult<Self> {
         Ok(Self {
             capacity,
-            queue_key: format!("__traffic-lights-{}", name),
+            name: format!("{}{}", REDIS_KEY_PREFIX, name),
             max_sleep: max_sleep.unwrap_or(0),
             client: validate_redis_url(redis_url)?,
         })
@@ -79,7 +79,7 @@ impl Semaphore {
 
             // Define queue if it doesn't already exist
             if get_script("src/scripts/rpushnx.lua")
-                .key(&ts.queue_key)
+                .key(&ts.name)
                 .arg(ts.capacity)
                 .invoke_async(&mut connection)
                 .await
@@ -94,7 +94,7 @@ impl Semaphore {
             // Wait for our turn - this waits non-blockingly until we're free to proceed
             let start = now_millis();
             connection
-                .blpop::<&str, Option<()>>(&ts.queue_key, ts.max_sleep as usize)
+                .blpop::<&str, Option<()>>(&ts.name, ts.max_sleep as usize)
                 .await
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
@@ -121,7 +121,7 @@ impl Semaphore {
 
             // Define queue if it doesn't exist
             get_script("src/scripts/rpushx.lua")
-                .key(&ts.queue_key)
+                .key(&ts.name)
                 .invoke_async(&mut connection)
                 .await
                 .map_err(|e| RedisError::new_err(e.to_string()))?;

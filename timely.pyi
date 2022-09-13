@@ -32,7 +32,7 @@ class Semaphore:
     ) -> None: ...
 
     capacity: int
-    queue_key: bytes
+    name: bytes
     max_sleep: int
 
     async def __aenter__(self) -> None: ...

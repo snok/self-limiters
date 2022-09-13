@@ -57,14 +57,14 @@ mod tests {
     #[test]
     fn test_send_and_receive_via_channel_semaphore_threaded() -> TLResult<()> {
         let client = Client::open("redis://127.0.0.1:6389").unwrap();
-        let queue_key = String::from("test");
+        let name = String::from("test");
         let capacity = 1;
         let max_sleep = 0;
 
         // Send and receive w/o thread
         let receiver = send_shared_state::<SemaphoreThreadState, TLError>(SemaphoreThreadState {
             client,
-            queue_key: queue_key.to_owned(),
+            name: name.to_owned(),
             capacity: capacity.to_owned(),
             max_sleep: max_sleep.to_owned(),
         })
@@ -74,7 +74,7 @@ mod tests {
         })
         .join()
         .unwrap();
-        assert_eq!(copied_ts.queue_key, queue_key);
+        assert_eq!(copied_ts.name, name);
         assert_eq!(copied_ts.capacity, capacity);
         Ok(())
     }
