@@ -1,11 +1,11 @@
 [package]
-name = "timely"
+name = "tl"
 version = "0.1.0"
 edition = "2021"
 include = ["/src"]
 
 [lib]
-name = "timely"
+name = "tl"
 crate-type = ["cdylib"]
 
 [features]

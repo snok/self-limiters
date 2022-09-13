@@ -35,7 +35,7 @@ impl ThreadState {
 
 #[pyclass]
 #[pyo3(name = "Semaphore")]
-#[pyo3(module = "timely")]
+#[pyo3(module = "tl")]
 pub struct Semaphore {
     #[pyo3(get)]
     capacity: u32,
@@ -58,7 +58,7 @@ impl Semaphore {
     ) -> PyResult<Self> {
         Ok(Self {
             capacity,
-            queue_key: format!("__timely-{}", name),
+            queue_key: format!("__traffic-lights-{}", name),
             max_sleep: max_sleep.unwrap_or(0),
             client: validate_redis_url(redis_url)?,
         })
@@ -126,9 +126,5 @@ impl Semaphore {
             debug!("Released semaphore");
             Ok(())
         })
-    }
-
-    fn __repr__(&self) -> String {
-        format!("Semaphore instance for queue {}", &self.queue_key)
     }
 }

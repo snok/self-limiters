@@ -1,12 +1,12 @@
 [project]
-name = "timely"
+name = "tl"
 version = "0.1.0"
 description = "Distributed async rate-limiting algorithms"
 authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
 license = { file = "LICENSE", type = 'BSD-3' }
-homepage = "https://github.com/snok/timely"
-repository = "https://github.com/snok/timely"
+homepage = "https://github.com/snok/traffic-lights"
+repository = "https://github.com/snok/traffic-lights"
 keywords = ["distributed", "async", "rate-limit", "rate", "limit", "limiting", "redis", "rust"]
 requires-python = ">=3.8"
 classifiers = [
@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 [project.urls]
-releases = "github.com/snok/timely/releases"
+releases = "github.com/snok/traffic-lights/releases"
 
 [build-system]
 requires = ["maturin>=0.13,<0.14"]

@@ -1,12 +1,12 @@
 <br>
 <p align="center">
-<a href="https://github.com/snok/timely"><img src="docs/tl5.svg" width="250px"></a>
+<a href="https://github.com/snok/traffic-lights"><img src="docs/logo.svg" width="250px"></a>
 <br>
 <b>Distributed async rate limiters</b>
 <br><br>
-<a href="https://pypi.org/project/timely/"><img alt="PyPI" src="https://img.shields.io/pypi/v/timely?label=Release&style=flat-square"></a>
-<a href="https://github.com/sondrelg/timely/actions/workflows/publish.yml"><img alt="PyPI" src="https://github.com/sondrelg/timely/actions/workflows/publish.yml/badge.svg"></a>
-<a href="https://codecov.io/gh/sondrelg/timely/"><img alt="PyPI" src="https://codecov.io/gh/sondrelg/timely/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+<a href="https://pypi.org/project/traffic-lights/"><img alt="PyPI" src="https://img.shields.io/pypi/v/traffic-lights?label=Release&style=flat-square"></a>
+<a href="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml"><img alt="PyPI" src="https://github.com/sondrelg/traffic-lights/actions/workflows/publish.yml/badge.svg"></a>
+<a href="https://codecov.io/gh/sondrelg/traffic-lights/"><img alt="PyPI" src="https://codecov.io/gh/sondrelg/traffic-lights/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 </p>
 
 
@@ -31,7 +31,7 @@ The overhead if both rate limiters should in other words be completely negligibl
 ## Installation
 
 ```bash
-pip install timely
+pip install traffic-lights
 ```
 
 ## The semaphore implementation
@@ -81,7 +81,7 @@ this slightly, we specify that the queue should expire after a short period of i
 The utility is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
 
 ```python
-from timely import Semaphore
+from tl import Semaphore
 
 
 # Instantiate a semaphore that will allow 10 concurrent requests
@@ -120,7 +120,7 @@ which also reduces complexity greatly.
 This is also implemented as a context manager in Python and can be used roughly as follows:
 
 ```python
-from timely import TokenBucket
+from tl import TokenBucket
 
 # Instantiate a bucket that will allow 10 requests per minute
 time_limited_queue = TokenBucket(
