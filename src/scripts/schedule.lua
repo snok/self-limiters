@@ -55,7 +55,7 @@ end
 tokens = tokens - 1
 
 -- Save state
-redis.call("SETEX", data_key, 10, string.format("%d %d", slot, tokens))
+redis.call("SETEX", data_key, 30, string.format("%d %d", slot, tokens))
 
 -- Return
 return slot
