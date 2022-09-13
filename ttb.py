@@ -12,7 +12,7 @@ logging.basicConfig(level='DEBUG', format=log_format)
 # Build and install
 import_hook.install(bindings='pyo3')
 
-from tl import TokenBucket  # noqa
+from self_limiters import TokenBucket  # noqa
 
 
 async def _consume(name):

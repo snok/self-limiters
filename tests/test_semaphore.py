@@ -4,7 +4,7 @@ import re
 from asyncio.exceptions import TimeoutError
 
 import pytest
-from tl import Semaphore
+from self_limiters import Semaphore
 
 from .conftest import run, semaphore_factory
 
