@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
+from uuid import uuid4
 
 import pytest
 
@@ -15,12 +16,13 @@ async def test_token_bucket_runtimes():
     frequency = 0.2
 
     # Ensure n tasks never complete in less than n/(refill_frequency * refill_amount)
+    name = f'runtimes-{uuid4()}'
     coro = asyncio.wait_for(
-        timeout=(frequency * n) - 0.05,
+        timeout=(frequency * n),
         fut=asyncio.gather(
             *[
                 asyncio.create_task(
-                    run(tokenbucket_factory(name='runtimes', capacity=1, refill_frequency=frequency), duration=0)
+                    run(tokenbucket_factory(name=name, capacity=1, refill_frequency=frequency), duration=0)
                 )
                 for i in range(n)
             ]

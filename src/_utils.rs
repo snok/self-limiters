@@ -59,11 +59,16 @@ pub(crate) fn validate_redis_url(redis_url: Option<&str>) -> TLResult<Client> {
             return Err(TLError::Redis(String::from("Failed to parse redis url")));
         }
     };
+
     let client = match Client::open(url) {
         Ok(client) => client,
         Err(e) => {
-            return Err(TLError::Redis(format!("Failed to connect to redis: {}", e)));
+            return Err(TLError::Redis(format!(
+                "Failed to open redis client: {}",
+                e
+            )));
         }
     };
+
     Ok(client)
 }

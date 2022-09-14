@@ -30,7 +30,8 @@ fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
 mod tests {
     use crate::_errors::TLError;
     use crate::_utils::{
-        open_client_connection, receive_shared_state, send_shared_state, TLResult,
+        get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
+        validate_redis_url, TLResult,
     };
     use crate::semaphore::ThreadState as SemaphoreThreadState;
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
@@ -103,5 +104,52 @@ mod tests {
             assert_eq!(copied_ts.amount, amount);
         });
         Ok(())
+    }
+
+    #[test]
+    fn test_get_script() -> TLResult<()> {
+        get_script("src/scripts/schedule.lua");
+        get_script("src/scripts/create_semaphore.lua");
+        get_script("src/scripts/release_semaphore.lua");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_now_millis() -> TLResult<()> {
+        let now = now_millis();
+        tokio::time::sleep(Duration::from_millis(30)).await;
+        assert!(now + 30 <= now_millis());
+        assert!(now + 33 >= now_millis());
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_redis_urls() -> () {
+        // Make sure these normal URLs pass parsing
+        for good_url in vec![
+            "redis://127.0.0.1",
+            "redis://username:@127.0.0.1",
+            "redis://username:password@127.0.0.1",
+            "redis://:password@127.0.0.1",
+            "rediss://127.0.0.1",
+            "rediss://test.com",
+            "redis+unix:///127.0.0.1",
+            "unix:///127.0.0.1",
+        ] {
+            for port_postfix in vec![":6379", ":1234", ""] {
+                validate_redis_url(Some(&format!("{}{}", good_url, port_postfix))).unwrap();
+            }
+        }
+
+        // None is also allowed, and we will try to connect to the default address
+        validate_redis_url(None).unwrap();
+
+        // Make sure these bad URLs fail
+        for bad_url in vec!["", "1", "127.0.0.1:6379", "test://127.0.0.1:6379"] {
+            let _ = match validate_redis_url(Some(bad_url)) {
+                Ok(_) => panic!("Should fail"),
+                Err(_) => (),
+            };
+        }
     }
 }

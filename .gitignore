@@ -74,3 +74,5 @@ docs/_build/
 ARGO_LLVM_COV_TARGET_DIR
 
 .env
+
+default.profraw

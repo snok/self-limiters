@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
+from uuid import uuid4
 
 import pytest
 from self_limiters import Semaphore
@@ -16,13 +17,11 @@ async def test_semaphore_runtimes():
     sleep = 0.4
 
     # Ensure n tasks never completed in less the time it would take for n nodes to finish sleeping
+    name = f'runtimes-{uuid4()}'
     coro = asyncio.wait_for(
         timeout=n * sleep,
         fut=asyncio.gather(
-            *[
-                asyncio.create_task(run(semaphore_factory(name='runtimes', capacity=1), duration=sleep))
-                for i in range(n)
-            ]
+            *[asyncio.create_task(run(semaphore_factory(name=name, capacity=1), duration=sleep)) for _ in range(n)]
         ),
     )
 
