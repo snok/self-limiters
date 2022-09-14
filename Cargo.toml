@@ -18,5 +18,4 @@ pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
 pyo3-log = "^0.6.0"
 tokio = "^1.20.1"
 redis = { version="^0.21.5", features = ["aio", "tokio-comp"] }
-redlock = { version="1.2.0", features = ["tokio", "async"] }
 log = "0.4.17"
