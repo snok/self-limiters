@@ -200,13 +200,3 @@ When testing locally:
 - processing 100 nodes with the token bucket implementation takes ~4ms
 
 <img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
-
-
-## Contributing
-
-### Debugging Lua scripts
-
-Assuming you have a redis server running at `:6389` you can debug
-a lua script by calling `redis-cli -u redis://127.0.0.1:6389 --ldb --eval src/semaphore/rpushnx.lua x 1`.
-
-Just type `help` in the debugger for options.

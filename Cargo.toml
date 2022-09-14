@@ -1,6 +1,6 @@
 [package]
 name = "self-limiters"
-version = "0.0.1"
+version = "0.0.0"  # This is set on release in the release workflow
 edition = "2021"
 include = ["/src"]
 
