@@ -4,24 +4,30 @@
 <br>
 <b>distributed async rate limiters for clients</b>
 <br><br>
+</p>
+<hr>
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters?label=Release&style=flat-square"></a>
 <a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
 <a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
-</p>
+<br>
 <br>
 
-This library provides a way to
-police your outgoing traffic with respect to:
+A package for self-regulating traffic. Useful when interacting with rate-limited
+resources, or to prevent spikes in outgoing traffic.
 
-- Concurrency, using a distributed [semaphore](https://en.wikipedia.org/wiki/semaphore_(programming))
-- Time, using a distributed [token bucket](https://en.wikipedia.org/wiki/Token_bucket)
+Makes it possible to regulate traffic with respect to:
 
-A self-limiting source produces traffic which never exceeds some upper bound.
-This is useful when interacting with a rate limited resource,
-or to prevent burstiness in traffic, generally.
+- **Concurrency** (max 5 active requests at the time, across all servers), or
+- **Time** (max 5 requests every 10 seconds, across all servers)
 
-To use this package, you'll need to be running an `async` stack,
-using Python 3.8 or above, and use redis.
+Concurrency constraints are handled using a distributed
+[semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)), while time-based
+constraints are handled using a distributed
+[token bucket](https://en.wikipedia.org/wiki/Token_bucket). Both implementations are
+FIFO, and are written with a mix of Rust and Lua for the best possible performance;
+more info below.
+
+Meant for use in async distributed systems. And, you'll need redis!
 
 ## Installation
 
@@ -34,18 +40,18 @@ pip install self-limiters
 Some parts of the package logic are implemented using Lua scripts, to run
 _on_ the redis instance. This makes it possible to do the same work in one
 request (from the client), that would otherwise need `n` requests. Lua scripts
-seems to present the most efficient way to run the required calls, and a
-call to a Lua script is non-blocking.
+seems to present the most efficient way to run the required calls, and client calls
+to Lua scripts are non-blocking.
 
-The flow of the semaphore implementation is:
-- Run [initial script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create semaphore if needed
-- Run [`BLPOP`](https://redis.io/commands/blpop/) to wait for the semaphore to return
-- Run [script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back capacity
+For example, the flow of the semaphore implementation is:
+- Run our [initial Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create the semaphore in Redis, if needed
+- Run [`BLPOP`](https://redis.io/commands/blpop/) to wait until we acquire the semaphore
+- Run [the cleanup script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back capacity
 
-All of these are non-blocking.
+Each step is one call by the client, and all of these are non-blocking.
 
-The flow for the token bucket implementation is:
-- Run initial script to retrieve a wake-up time
+For the second implementation, the token bucket, the breakdown is even simpler.
+- Run the [initial Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) to retrieve a wake-up time
 - Sleep asynchronously until the wake-up time
 
 Both of these are also non-blocking.
@@ -112,11 +118,11 @@ The expiry is 30 seconds at the time of writing, but could be made configurable.
 The utility is implemented as a context manager in Python. Here is an example of a semaphore which will allow 10 concurrent requests:
 
 ```python
-from self_limiters import semaphore
+from self_limiters import Semaphore
 
 
 # Instantiate a semaphore that will allow 10 concurrent requests
-concurrency_limited_queue = semaphore(
+concurrency_limited_queue = Semaphore(
     name="unique-resource-name",
     capacity=10,
     redis_url="redis://localhost:6379"
@@ -200,3 +206,7 @@ When testing locally:
 - processing 100 nodes with the token bucket implementation takes ~4ms
 
 <img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
+
+## Contributing
+
+Please do!
