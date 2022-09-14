@@ -19,10 +19,10 @@ a lua script by calling `redis-cli -u redis://127.0.0.1:6389 --ldb --eval src/se
 
 Just type `help` in the debugger for options.
 
-## Coverage 
+## Coverage
 
 Since some of our tests are written in Rust, and some are written in Python,
 we've modelled our codecov setup after [this](https://github.com/cjermain/rust-python-coverage)
-project. The process consists of running both test suites with individual coverage tools, then 
+project. The process consists of running both test suites with individual coverage tools, then
 patching the coverage data together via codecov (so far it's been a bit flaky, not always
 picking up the python codecov)
