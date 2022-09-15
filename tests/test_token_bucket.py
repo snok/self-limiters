@@ -75,3 +75,39 @@ def test_class_attributes():
 def test_repr():
     tb = tokenbucket_factory(name='test', capacity=1)()
     assert re.match(r'Token bucket instance for queue __self-limiters-test', str(tb))  # noqa: W605
+
+
+@pytest.mark.parametrize(
+    'config,e',
+    [
+        ({'name': ''}, None),
+        ({'name': None}, TypeError),
+        ({'name': 1}, TypeError),
+        ({'name': True}, TypeError),
+        ({'capacity': 2}, None),
+        ({'capacity': 2.2}, TypeError),
+        ({'capacity': None}, TypeError),
+        ({'capacity': 'test'}, TypeError),
+        ({'refill_frequency': 2.2}, None),
+        ({'refill_frequency': 'test'}, TypeError),
+        ({'refill_frequency': None}, TypeError),
+        ({'refill_frequency': -1}, ValueError),
+        ({'refill_amount': 1}, None),
+        ({'refill_amount': -1}, ValueError),
+        ({'refill_amount': 'test'}, TypeError),
+        ({'refill_amount': None}, TypeError),
+        ({'redis_url': 'redis://a.b'}, None),
+        ({'redis_url': 1}, TypeError),
+        ({'redis_url': True}, TypeError),
+        ({'max_sleep': 20}, None),
+        ({'max_sleep': 0}, None),
+        ({'max_sleep': 'test'}, TypeError),
+        ({'max_sleep': None}, None),
+    ],
+)
+def test_init_types(config, e):
+    if e:
+        with pytest.raises(e):
+            tokenbucket_factory(**config)()
+    else:
+        tokenbucket_factory(**config)()

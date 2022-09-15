@@ -64,3 +64,31 @@ def test_class_attributes():
 def test_repr():
     semaphore = Semaphore(name='test', capacity=1)
     assert re.match(r'Semaphore instance for queue __self-limiters-test', str(semaphore))  # noqa: W605
+
+
+@pytest.mark.parametrize(
+    'config,e',
+    [
+        ({'name': ''}, None),
+        ({'name': None}, TypeError),
+        ({'name': 1}, TypeError),
+        ({'name': True}, TypeError),
+        ({'capacity': 2}, None),
+        ({'capacity': 2.2}, TypeError),
+        ({'capacity': None}, TypeError),
+        ({'capacity': 'test'}, TypeError),
+        ({'redis_url': 'redis://a.b'}, None),
+        ({'redis_url': 1}, TypeError),
+        ({'redis_url': True}, TypeError),
+        ({'max_sleep': 20}, None),
+        ({'max_sleep': 0}, None),
+        ({'max_sleep': 'test'}, TypeError),
+        ({'max_sleep': None}, None),
+    ],
+)
+def test_init_types(config, e):
+    if e:
+        with pytest.raises(e):
+            semaphore_factory(**config)()
+    else:
+        semaphore_factory(**config)()

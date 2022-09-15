@@ -13,4 +13,4 @@ source "$VIRTUAL_ENV"/bin/activate \
   && maturin develop \
   && coverage run -m pytest tests
 
-cargo llvm-cov report
+cargo llvm-cov report --ignore-filename-regex _errors
