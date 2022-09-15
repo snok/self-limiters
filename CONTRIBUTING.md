@@ -19,6 +19,11 @@ a lua script by calling `redis-cli -u redis://127.0.0.1:6389 --ldb --eval src/se
 
 Just type `help` in the debugger for options.
 
+## Running tests
+
+The tests rely on a Redis instance running on port 6389.
+Run `docker compose up -d` to start the dc redis.
+
 ## Coverage
 
 Since some of our tests are written in Rust, and some are written in Python,

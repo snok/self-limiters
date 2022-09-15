@@ -64,7 +64,7 @@ def test_class_attributes():
 
 def test_repr():
     semaphore = Semaphore(name='test', capacity=1)
-    assert re.match(r'Semaphore instance for queue __self-limiters-test', str(semaphore))  # noqa: W605
+    assert re.match(r'Semaphore instance for queue __self-limiters:test', str(semaphore))  # noqa: W605
 
 
 @pytest.mark.parametrize(

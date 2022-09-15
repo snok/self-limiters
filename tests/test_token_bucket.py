@@ -76,7 +76,7 @@ def test_class_attributes():
 
 def test_repr():
     tb = tokenbucket_factory(name='test', capacity=1)()
-    assert re.match(r'Token bucket instance for queue __self-limiters-test', str(tb))  # noqa: W605
+    assert re.match(r'Token bucket instance for queue __self-limiters:test', str(tb))  # noqa: W605
 
 
 @pytest.mark.parametrize(

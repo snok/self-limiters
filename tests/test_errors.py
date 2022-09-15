@@ -31,7 +31,7 @@ async def test_redis_error():
     Test failed redis operation in the main semaphore flow.
     """
     name = f'error-test-{uuid4()}'
-    queue_name = f'__self-limiters-{name}'
+    queue_name = f'__self-limiters:{name}'
 
     async def corrupt_queue():
         # Wait 0.1 seconds then corrupt the queue
