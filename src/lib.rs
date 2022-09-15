@@ -28,7 +28,7 @@ fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use crate::_errors::TLError;
+    use crate::_errors::SLError;
     use crate::_utils::{
         get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
         validate_redis_url, TLResult,
@@ -57,7 +57,7 @@ mod tests {
         let max_sleep = 0;
 
         // Send and receive w/o thread
-        let receiver = send_shared_state::<SemaphoreThreadState, TLError>(SemaphoreThreadState {
+        let receiver = send_shared_state::<SemaphoreThreadState, SLError>(SemaphoreThreadState {
             client,
             name: name.to_owned(),
             capacity: capacity.to_owned(),
@@ -65,7 +65,7 @@ mod tests {
         })
         .unwrap();
         let copied_ts = thread::spawn(move || {
-            receive_shared_state::<SemaphoreThreadState, TLError>(receiver).unwrap()
+            receive_shared_state::<SemaphoreThreadState, SLError>(receiver).unwrap()
         })
         .join()
         .unwrap();
@@ -85,7 +85,7 @@ mod tests {
 
         // Send and receive w/o thread
         let receiver =
-            send_shared_state::<TokenBucketThreadState, TLError>(TokenBucketThreadState {
+            send_shared_state::<TokenBucketThreadState, SLError>(TokenBucketThreadState {
                 client,
                 name: name.to_owned(),
                 capacity: capacity.to_owned(),
@@ -96,7 +96,7 @@ mod tests {
             .unwrap();
         thread::spawn(move || {
             let copied_ts =
-                receive_shared_state::<TokenBucketThreadState, TLError>(receiver).unwrap();
+                receive_shared_state::<TokenBucketThreadState, SLError>(receiver).unwrap();
             assert_eq!(copied_ts.name, name);
             assert_eq!(copied_ts.capacity, capacity);
             assert_eq!(copied_ts.max_sleep, max_sleep);

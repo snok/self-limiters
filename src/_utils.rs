@@ -1,4 +1,4 @@
-use crate::_errors::TLError;
+use crate::_errors::SLError;
 use redis::aio::Connection;
 use redis::{parse_redis_url, Client, Script};
 use std::fs::File;
@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub type TLResult<T> = Result<T, TLError>;
+pub type TLResult<T> = Result<T, SLError>;
 
 const REDIS_DEFAULT_URL: &str = "redis://127.0.0.1:6379";
 pub(crate) const REDIS_KEY_PREFIX: &str = "__self-limiters-";
@@ -29,10 +29,10 @@ pub(crate) fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
 }
 
 /// Open Redis connection
-pub(crate) async fn open_client_connection(client: &Client) -> Result<Connection, TLError> {
+pub(crate) async fn open_client_connection(client: &Client) -> Result<Connection, SLError> {
     match client.get_async_connection().await {
         Ok(connection) => Ok(connection),
-        Err(e) => Err(TLError::Redis(e.to_string())),
+        Err(e) => Err(SLError::Redis(e.to_string())),
     }
 }
 
@@ -56,14 +56,14 @@ pub(crate) fn validate_redis_url(redis_url: Option<&str>) -> TLResult<Client> {
     let url = match parse_redis_url(redis_url.unwrap_or(REDIS_DEFAULT_URL)) {
         Some(url) => url,
         None => {
-            return Err(TLError::Redis(String::from("Failed to parse redis url")));
+            return Err(SLError::Redis(String::from("Failed to parse redis url")));
         }
     };
 
     let client = match Client::open(url) {
         Ok(client) => client,
         Err(e) => {
-            return Err(TLError::Redis(format!(
+            return Err(SLError::Redis(format!(
                 "Failed to open redis client: {}",
                 e
             )));

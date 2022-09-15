@@ -8,15 +8,15 @@ use std::sync::mpsc::{RecvError, SendError};
 use tokio::task::JoinError;
 
 // Raised when redis::RedisError is raised downstream.
-create_exception!(tl, RedisError, PyException);
+create_exception!(self_limiters, RedisError, PyException);
 
 // Raised when we've slept for too long.
 // Useful to catch forever-growing queues.
-create_exception!(tl, MaxSleepExceededError, PyException);
+create_exception!(self_limiters, MaxSleepExceededError, PyException);
 
 /// Enum containing all handled errors.
 #[derive(Debug)]
-pub enum TLError {
+pub enum SLError {
     MaxSleepExceeded(String),
     Redis(String),
     RuntimeError(String),
@@ -24,49 +24,49 @@ pub enum TLError {
 }
 
 // Map relevant error types to appropriate Python exceptions
-impl From<TLError> for PyErr {
-    fn from(e: TLError) -> PyErr {
+impl From<SLError> for PyErr {
+    fn from(e: SLError) -> PyErr {
         match e {
-            TLError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
-            TLError::Redis(e) => RedisError::new_err(e),
-            TLError::RuntimeError(e) => PyRuntimeError::new_err(e),
-            TLError::ValueError(e) => PyValueError::new_err(e),
+            SLError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
+            SLError::Redis(e) => RedisError::new_err(e),
+            SLError::RuntimeError(e) => PyRuntimeError::new_err(e),
+            SLError::ValueError(e) => PyValueError::new_err(e),
         }
     }
 }
 
-impl From<RedisLibError> for TLError {
+impl From<RedisLibError> for SLError {
     fn from(e: RedisLibError) -> Self {
-        TLError::Redis(e.to_string())
+        SLError::Redis(e.to_string())
     }
 }
 
-impl From<ParseIntError> for TLError {
+impl From<ParseIntError> for SLError {
     fn from(e: ParseIntError) -> Self {
-        TLError::RuntimeError(e.to_string())
+        SLError::RuntimeError(e.to_string())
     }
 }
 
-impl From<JoinError> for TLError {
+impl From<JoinError> for SLError {
     fn from(e: JoinError) -> Self {
-        TLError::RuntimeError(e.to_string())
+        SLError::RuntimeError(e.to_string())
     }
 }
 
-impl<T> From<SendError<T>> for TLError {
+impl<T> From<SendError<T>> for SLError {
     fn from(e: SendError<T>) -> Self {
-        TLError::RuntimeError(e.to_string())
+        SLError::RuntimeError(e.to_string())
     }
 }
 
-impl From<RecvError> for TLError {
+impl From<RecvError> for SLError {
     fn from(e: RecvError) -> Self {
-        TLError::RuntimeError(e.to_string())
+        SLError::RuntimeError(e.to_string())
     }
 }
 
-impl From<FromUtf8Error> for TLError {
+impl From<FromUtf8Error> for SLError {
     fn from(e: FromUtf8Error) -> Self {
-        TLError::RuntimeError(e.to_string())
+        SLError::RuntimeError(e.to_string())
     }
 }

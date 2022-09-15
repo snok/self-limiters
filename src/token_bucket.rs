@@ -8,7 +8,7 @@ use pyo3_asyncio::tokio::future_into_py;
 use redis::Client;
 
 use crate::RedisError;
-use crate::_errors::TLError;
+use crate::_errors::SLError;
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
     validate_redis_url, TLResult, REDIS_KEY_PREFIX,

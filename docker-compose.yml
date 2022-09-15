@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   redis:
-    container_name: 'tl-redis'
+    container_name: 'sl-redis'
     image: redis:alpine
     command: redis-server --appendonly yes
     ports:
