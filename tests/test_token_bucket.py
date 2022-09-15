@@ -2,9 +2,11 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
+from self_limiters import MaxSleepExceededError
 
 from .conftest import run, tokenbucket_factory
 
@@ -111,3 +113,34 @@ def test_init_types(config, e):
             tokenbucket_factory(**config)()
     else:
         tokenbucket_factory(**config)()
+
+
+async def r(**kw):
+    async with tokenbucket_factory(**kw)():
+        pass
+
+
+@pytest.mark.parametrize(
+    'n,duration',
+    [
+        (100, 1.1),
+        (1000, 11),
+    ],
+)
+async def test_high_load(n, duration):
+    # This should pass, and should run under a threshold
+    name = uuid4().hex[:6]
+    start = datetime.now()
+    await asyncio.gather(*[asyncio.create_task(r(refill_frequency=0.01, name=name)) for _ in range(n)])
+    assert datetime.now() - start < timedelta(seconds=duration)
+
+
+async def test_max_sleep():
+    name = uuid4().hex[:6]
+    with pytest.raises(
+        MaxSleepExceededError,
+        match=(
+            'Received wake up time in [0-9] seconds, which is greater or equal to the specified max sleep of 1 seconds'
+        ),
+    ):
+        await asyncio.gather(*[asyncio.create_task(r(name=name, max_sleep=1)) for _ in range(10)])

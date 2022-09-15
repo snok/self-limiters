@@ -2,10 +2,11 @@ import asyncio
 import logging
 import re
 from asyncio.exceptions import TimeoutError
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
-from self_limiters import Semaphore
+from self_limiters import MaxSleepExceededError, Semaphore
 
 from .conftest import run, semaphore_factory
 
@@ -92,3 +93,29 @@ def test_init_types(config, e):
             semaphore_factory(**config)()
     else:
         semaphore_factory(**config)()
+
+
+async def r(sleep, **kw):
+    async with semaphore_factory(**kw)():
+        await asyncio.sleep(sleep)
+
+
+@pytest.mark.parametrize(
+    'n,duration',
+    [
+        (100, 1),
+        (1000, 3),
+    ],
+)
+async def test_high_load(n, duration):
+    # This should pass, and should run under a threshold
+    name = uuid4().hex[:6]
+    start = datetime.now()
+    await asyncio.gather(*[asyncio.create_task(r(0, name=name)) for _ in range(n)])
+    assert datetime.now() - start < timedelta(seconds=duration)
+
+
+async def test_max_sleep():
+    name = uuid4().hex[:6]
+    with pytest.raises(MaxSleepExceededError, match='Max sleep exceeded when waiting for Semaphore'):
+        await asyncio.gather(*[asyncio.create_task(r(1, name=name, max_sleep=1)) for _ in range(3)])

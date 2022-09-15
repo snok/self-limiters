@@ -40,8 +40,9 @@ impl ThreadState {
 
 pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResult<()> {
     if max_sleep.as_secs_f32() > 0.0 && sleep_duration > max_sleep {
-        return Err(TLError::MaxSleepExceeded(format!(
-            "Sleep duration {} exceeds max sleep {}",
+        return Err(SLError::MaxSleepExceeded(format!(
+            "Received wake up time in {} seconds, which is \
+            greater or equal to the specified max sleep of {} seconds",
             sleep_duration.as_secs(),
             max_sleep.as_secs()
         )));
@@ -99,11 +100,12 @@ impl TokenBucket {
                 "Refill amount must be greater than 0",
             ));
         }
+
         Ok(Self {
             capacity: capacity as u32,
             refill_amount: refill_amount as u32,
             refill_frequency,
-            max_sleep: Duration::from_millis((max_sleep.unwrap_or(0.0)) as u64),
+            max_sleep: Duration::from_secs((max_sleep.unwrap_or(0.0)) as u64),
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             client: validate_redis_url(redis_url)?,
         })
@@ -113,10 +115,10 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, TLError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, TLError>(receiver)?;
+            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
 
             // Connect to redis
             let mut connection = open_client_connection(&ts.client).await?;
