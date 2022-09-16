@@ -124,9 +124,9 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_redis_urls() -> () {
+    fn test_validate_redis_urls() {
         // Make sure these normal URLs pass parsing
-        for good_url in vec![
+        for good_url in &[
             "redis://127.0.0.1",
             "redis://username:@127.0.0.1",
             "redis://username:password@127.0.0.1",
@@ -136,7 +136,7 @@ mod tests {
             "redis+unix:///127.0.0.1",
             "unix:///127.0.0.1",
         ] {
-            for port_postfix in vec![":6379", ":1234", ""] {
+            for port_postfix in &[":6379", ":1234", ""] {
                 validate_redis_url(Some(&format!("{}{}", good_url, port_postfix))).unwrap();
             }
         }
@@ -145,11 +145,10 @@ mod tests {
         validate_redis_url(None).unwrap();
 
         // Make sure these bad URLs fail
-        for bad_url in vec!["", "1", "127.0.0.1:6379", "test://127.0.0.1:6379"] {
-            let _ = match validate_redis_url(Some(bad_url)) {
-                Ok(_) => panic!("Should fail"),
-                Err(_) => (),
-            };
+        for bad_url in &["", "1", "127.0.0.1:6379", "test://127.0.0.1:6379"] {
+            if let Ok(_) = validate_redis_url(Some(bad_url)) {
+                panic!("Should fail")
+            }
         }
     }
 }
