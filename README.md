@@ -1,4 +1,5 @@
 <br>
+<br>
 <p align="center">
 <a href="https://github.com/sondrelg/self-limiters"><img src="docs/logo.svg" width="250px"></a>
 <br>
@@ -15,15 +16,15 @@
 
 This library implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
 as well as the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
-Both implementations are FIFO, and use redis as a backend.
+Both implementations are FIFO, and use redis as the backend.
 
 Between them, the two implementations make it possible to regulate traffic with respect to:
 
 - **Concurrency based limits** (max 5 active requests at the time, across all servers), or
 - **Time based limits** (max 5 requests every 10 seconds, across all servers)
 
-While the motivation for implementing the semaphore and token bucket algorithm was to help
-with rate-limiting, they can be used for anything.
+The motivation for implementing these was to help with rate-limiting,
+but the semaphore and token bucket implementations can be used for anything.
 
 # Installation
 
