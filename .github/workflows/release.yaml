@@ -71,9 +71,7 @@ jobs:
         run: cargo update -p self-limiters
         if: "startsWith(github.ref, 'refs/tags/')"
 
-      - run: |
-          pip install -U twine 'black>=22.3.0,<23' typing_extensions
-          sudo apt install libssl-dev
+      - run: pip install -U twine 'black>=22.3.0,<23' typing_extensions
 
       - name: build wheels
         uses: messense/maturin-action@v1
