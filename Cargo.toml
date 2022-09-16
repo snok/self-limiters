@@ -17,5 +17,6 @@ pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
 pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
 pyo3-log = "^0.6.0"
 tokio = "^1.20.1"
-redis = { version="^0.21.5", features = ["tokio-comp"] }
+redis = { version="^0.21.5", features = ["tokio-comp",  "tokio-native-tls-comp"] }
 log = "0.4.17"
+openssl = "0.10.41"
