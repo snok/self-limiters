@@ -100,14 +100,14 @@ from self_limiters import Semaphore
 
 def limit(name, capacity):
     # Initialize semaphore or token bucket
-    limiter = Semaphore(name=name, capacity=capacity, ...)
+    limiter = Semaphore(name=name, capacity=capacity, redis_url="redis://127.0.0.1:6389")
 
-    async def middle(f):
-        @wraps(f)
+    def middle(f):
         async def inner(*args, **kwargs):
             # Use context manager within the decorator
             async with limiter:
-                return f(*args, **kwargs)
+                return await f(*args, **kwargs)
+
         return inner
     return middle
 
