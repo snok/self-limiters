@@ -16,7 +16,7 @@
 
 This library implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
 as well as the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
-Both implementations are FIFO, and use redis as the backend.
+Both implementations are FIFO, and require redis.
 
 Between them, the two implementations make it possible to regulate traffic with respect to:
 
@@ -123,7 +123,7 @@ def retrieve_user(id: UUID) -> User:
 Some parts of the package logic are implemented using Lua scripts, to run
 _on_ the redis instance. This makes it possible to do the same work in one
 request (from the client), that would otherwise need `n` requests. Lua scripts
-seems to present the most efficient way to run the calls each implementation
+seem to present the most efficient way to run the calls each implementation
 requires us to, and client calls to Lua scripts are non-blocking.
 
 For example, the flow of the semaphore implementation is:
