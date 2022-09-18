@@ -3,10 +3,12 @@ extern crate redis;
 use crate::_errors::SLError;
 use crate::{MaxSleepExceededError, RedisError};
 use log::{debug, info};
+use pyo3::basic::getattr;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Client};
+use std::str::FromStr;
 
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
@@ -69,6 +71,52 @@ impl Semaphore {
 
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
         let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+
+        let redis_receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+
+        println!("Trying redis");
+        let _ = Python::with_gil(|py| {
+            let rs = receive_shared_state::<ThreadState, SLError>(redis_receiver).unwrap();
+            // Import redis
+            let redis = PyModule::import(py, "redis")
+                .unwrap()
+                // access .Redis
+                .getattr("Redis")
+                .unwrap()
+                // access .from_url
+                .getattr("from_url")
+                .unwrap()
+                // Pass in redis URL (this is not how we'll do it, but this works for a demo)
+                .call1(PyTuple::new(
+                    py,
+                    vec![format!(
+                        "redis://{}",
+                        rs.client.get_connection_info().addr.to_string()
+                    )],
+                ))
+                .unwrap();
+            // Set value
+            let _ = redis.getattr("set").unwrap().call1(("key", 1)).unwrap();
+            // Get value
+            let result: Option<Vec<u8>> = redis
+                .getattr("get")
+                .unwrap()
+                .call1(("key",))
+                .unwrap()
+                .extract()
+                .unwrap();
+
+            println!("{:?}", redis);
+            if result.is_some() {
+                // Unpack Option
+                let temp = result.unwrap();
+                // Parse string from vector of bytes (Vec<u8>)
+                let decoded_result = String::from_utf8_lossy(&temp);
+                // Parse i32 from string
+                let int_result = i32::from_str(&decoded_result).unwrap();
+                println!("{:?}", int_result);
+            }
+        });
 
         future_into_py(py, async {
             // Retrieve thread state struct

@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from maturin import import_hook
+from redis import Redis
 
 log_format = '[%(asctime)s] [%(levelname)s] - %(message)s'
 logging.basicConfig(level='DEBUG', format=log_format)
@@ -28,7 +29,7 @@ async def _consume(name):
 
 async def main():
     name = uuid4().hex[:6]
-    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(100)])
+    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(1)])
 
 
 start = datetime.now()
