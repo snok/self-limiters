@@ -15,7 +15,7 @@ use crate::_utils::{
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
-pub(crate) struct ThreadState {
+pub struct ThreadState {
     pub(crate) client: Client,
     pub(crate) name: String,
     pub(crate) capacity: u32,
@@ -23,8 +23,8 @@ pub(crate) struct ThreadState {
 }
 
 impl ThreadState {
-    fn from(slf: &PyRef<Semaphore>) -> ThreadState {
-        ThreadState {
+    fn from(slf: &PyRef<Semaphore>) -> Self {
+        Self {
             name: slf.name.clone(),
             capacity: slf.capacity,
             client: slf.client.clone(),
@@ -99,7 +99,7 @@ impl Semaphore {
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
             // Raise an exception if we waited too long
-            if ts.max_sleep != 0 && (now_millis() - start) > (ts.max_sleep as f32 * 1000.0) as u64 {
+            if ts.max_sleep != 0 && (now_millis() - start) > (ts.max_sleep as f64 * 1000.0) as u64 {
                 return Err(MaxSleepExceededError::new_err(
                     "Max sleep exceeded when waiting for Semaphore".to_string(),
                 ));

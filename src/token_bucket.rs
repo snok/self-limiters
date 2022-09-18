@@ -26,8 +26,8 @@ pub struct ThreadState {
 }
 
 impl ThreadState {
-    fn from(slf: &PyRef<TokenBucket>) -> ThreadState {
-        ThreadState {
+    fn from(slf: &PyRef<TokenBucket>) -> Self {
+        Self {
             capacity: slf.capacity,
             frequency: slf.refill_frequency,
             amount: slf.refill_amount,
@@ -84,9 +84,9 @@ impl TokenBucket {
     #[new]
     fn new(
         name: String,
-        capacity: i64,
+        capacity: u32,
         refill_frequency: f32,
-        refill_amount: i64,
+        refill_amount: u32,
         redis_url: Option<&str>,
         max_sleep: Option<f64>,
     ) -> PyResult<Self> {
@@ -95,15 +95,10 @@ impl TokenBucket {
                 "Refill frequency must be greater than 0",
             ));
         }
-        if refill_amount <= 0 {
-            return Err(PyValueError::new_err(
-                "Refill amount must be greater than 0",
-            ));
-        }
 
         Ok(Self {
-            capacity: capacity as u32,
-            refill_amount: refill_amount as u32,
+            capacity,
+            refill_amount,
             refill_frequency,
             max_sleep: Duration::from_secs((max_sleep.unwrap_or(0.0)) as u64),
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
