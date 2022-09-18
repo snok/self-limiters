@@ -10,10 +10,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub type TLResult<T> = Result<T, SLError>;
 
 const REDIS_DEFAULT_URL: &str = "redis://127.0.0.1:6379";
-pub(crate) const REDIS_KEY_PREFIX: &str = "__self-limiters:";
+pub const REDIS_KEY_PREFIX: &str = "__self-limiters:";
 
 /// Open a channel and send some data
-pub(crate) fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
+pub fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
     ts: T,
 ) -> Result<Receiver<T>, E> {
     let (sender, receiver) = channel();
@@ -22,21 +22,21 @@ pub(crate) fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
 }
 
 /// Read data from channel
-pub(crate) fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
+pub fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
     receiver: Receiver<T>,
 ) -> Result<T, E> {
     Ok(receiver.recv()?)
 }
 
 /// Open Redis connection
-pub(crate) async fn open_client_connection(client: &Client) -> Result<Connection, SLError> {
+pub async fn open_client_connection(client: &Client) -> Result<Connection, SLError> {
     match client.get_async_connection().await {
         Ok(connection) => Ok(connection),
         Err(e) => Err(SLError::Redis(e.to_string())),
     }
 }
 
-pub(crate) fn get_script(path: &str) -> Script {
+pub fn get_script(path: &str) -> Script {
     let path = Path::new(path);
     let mut file = File::open(path).unwrap();
     let mut content = String::new();
@@ -44,7 +44,7 @@ pub(crate) fn get_script(path: &str) -> Script {
     Script::new(&content)
 }
 
-pub(crate) fn now_millis() -> u64 {
+pub fn now_millis() -> u64 {
     // Beware: This will fail with an overflow error in 500 thousand years
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -52,7 +52,7 @@ pub(crate) fn now_millis() -> u64 {
         .as_millis() as u64
 }
 
-pub(crate) fn validate_redis_url(redis_url: Option<&str>) -> TLResult<Client> {
+pub fn validate_redis_url(redis_url: Option<&str>) -> TLResult<Client> {
     let url = match parse_redis_url(redis_url.unwrap_or(REDIS_DEFAULT_URL)) {
         Some(url) => url,
         None => {

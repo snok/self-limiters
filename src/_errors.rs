@@ -25,7 +25,7 @@ pub enum SLError {
 
 // Map relevant error types to appropriate Python exceptions
 impl From<SLError> for PyErr {
-    fn from(e: SLError) -> PyErr {
+    fn from(e: SLError) -> Self {
         match e {
             SLError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
             SLError::Redis(e) => RedisError::new_err(e),
@@ -37,36 +37,36 @@ impl From<SLError> for PyErr {
 
 impl From<RedisLibError> for SLError {
     fn from(e: RedisLibError) -> Self {
-        SLError::Redis(e.to_string())
+        Self::Redis(e.to_string())
     }
 }
 
 impl From<ParseIntError> for SLError {
     fn from(e: ParseIntError) -> Self {
-        SLError::RuntimeError(e.to_string())
+        Self::RuntimeError(e.to_string())
     }
 }
 
 impl From<JoinError> for SLError {
     fn from(e: JoinError) -> Self {
-        SLError::RuntimeError(e.to_string())
+        Self::RuntimeError(e.to_string())
     }
 }
 
 impl<T> From<SendError<T>> for SLError {
     fn from(e: SendError<T>) -> Self {
-        SLError::RuntimeError(e.to_string())
+        Self::RuntimeError(e.to_string())
     }
 }
 
 impl From<RecvError> for SLError {
     fn from(e: RecvError) -> Self {
-        SLError::RuntimeError(e.to_string())
+        Self::RuntimeError(e.to_string())
     }
 }
 
 impl From<FromUtf8Error> for SLError {
     fn from(e: FromUtf8Error) -> Self {
-        SLError::RuntimeError(e.to_string())
+        Self::RuntimeError(e.to_string())
     }
 }
