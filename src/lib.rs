@@ -2,7 +2,7 @@ extern crate core;
 
 use pyo3::prelude::*;
 
-use token_bucket::TokenBucket;
+// use token_bucket::TokenBucket;
 
 use crate::_errors::{MaxSleepExceededError, RedisError};
 use crate::semaphore::Semaphore;
@@ -21,7 +21,7 @@ fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     )?;
     m.add("RedisError", py.get_type::<RedisError>())?;
     m.add_class::<Semaphore>()?;
-    m.add_class::<TokenBucket>()?;
+    // m.add_class::<TokenBucket>()?;
 
     Ok(())
 }

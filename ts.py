@@ -28,7 +28,7 @@ async def _consume(name):
 
 async def main():
     name = uuid4().hex[:6]
-    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(100)])
+    await asyncio.gather(*[asyncio.create_task(_consume(name)) for _ in range(1)])
 
 
 start = datetime.now()

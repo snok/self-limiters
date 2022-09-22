@@ -1,7 +1,6 @@
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use redis::RedisError as RedisLibError;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{RecvError, SendError};
@@ -32,12 +31,6 @@ impl From<SLError> for PyErr {
             SLError::RuntimeError(e) => PyRuntimeError::new_err(e),
             SLError::ValueError(e) => PyValueError::new_err(e),
         }
-    }
-}
-
-impl From<RedisLibError> for SLError {
-    fn from(e: RedisLibError) -> Self {
-        Self::Redis(e.to_string())
     }
 }
 
