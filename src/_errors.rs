@@ -1,6 +1,7 @@
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use std::convert::Infallible;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use std::sync::mpsc::{RecvError, SendError};

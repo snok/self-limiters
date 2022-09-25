@@ -70,25 +70,12 @@ pub fn now_millis() -> u64 {
         .as_millis() as u64
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct Redis<'a> {
-    redis: &'a PyAny,
+#[derive(Debug)]
+pub struct Redis {
+    pub(crate) redis: Py<PyAny>,
 }
 
-impl Redis<'_> {
-    pub fn new<'a>(py: Python<'a>, redis_url: &'a str) -> Redis<'a> {
-        Redis {
-            redis: PyModule::import(py, "redis")
-                .unwrap()
-                // access .Redis
-                .getattr("Redis")
-                .unwrap(), // access .from_url
-                           // .getattr("from_url")
-                           // .unwrap(), // Pass in redis URL (this is not how we'll do it, but this works for a demo)
-                           // .call1((redis_url.to_owned(),))
-                           // .unwrap()
-        }
-    }
+impl Redis {
     //
     // pub fn set(self, key: &str, value: i32) {
     //     self.redis

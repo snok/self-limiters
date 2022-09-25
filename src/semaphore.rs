@@ -78,7 +78,16 @@ impl Semaphore {
             let ts = receive_shared_state::<ThreadState, SLError>(receiver).unwrap();
 
             // Create struct containing an redis.asyncio.Redis class instance
-            let redis = Python::with_gil(move |py| Redis::new(py, &ts.redis_url));
+            let redis =
+                Python::with_gil(|py| {
+                    let r = PyModule::from_code(
+                    py,
+                    "from redis.asyncio import Redis; r = Redis.from_url('redis://127.0.0.1:6389')",
+                    "",
+                    ""
+                ).unwrap().getattr("r").into();
+                    Redis { redis: r }
+                });
 
             // Call Lua script, using redis class instance, to define
             // a queue for the semaphore if it doesn't already exist.
