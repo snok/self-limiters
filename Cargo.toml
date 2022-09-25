@@ -12,9 +12,10 @@ crate-type = ["cdylib"]
 unstable = ["clippy"]
 
 [dependencies]
-clippy = { version = "*", optional = true }
 pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
 pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
 pyo3-log = "^0.6.0"
 tokio = "^1.20.1"
 log = "0.4.17"
+
+clippy = { version = "*", optional = true }

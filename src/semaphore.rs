@@ -1,14 +1,18 @@
+use crate::MaxSleepExceededError;
+use crate::_errors::SLError;
+use crate::_utils::{
+    get_script, get_script_sha, now_millis, receive_shared_state, send_shared_state, Redis,
+    REDIS_KEY_PREFIX,
+};
 use log::{debug, info};
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
-
-use crate::MaxSleepExceededError;
-use crate::_errors::SLError;
-use crate::_utils::{get_redis, get_script, get_script_sha, now_millis, receive_shared_state, Redis, REDIS_KEY_PREFIX, run_script, send_shared_state};
+use std::pin::Pin;
 
 mod redis {
+    // Import the Python redis.NoScriptError exception
     pyo3::import_exception!(redis, NoScriptError);
 }
 
@@ -70,43 +74,55 @@ impl Semaphore {
         let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            // Retrieve thread state struct
+            // Collect thread state struct
             let ts = receive_shared_state::<ThreadState, SLError>(receiver).unwrap();
 
-            let redis = Python::with_gil(|py| {
-                get_redis(py, &ts.redis_url)
-            });
+            // Create struct containing an redis.asyncio.Redis class instance
+            let redis = Python::with_gil(move |py| Redis::new(py, &ts.redis_url));
 
-            // Define queue if it doesn't already exist
+            // Call Lua script, using redis class instance, to define
+            // a queue for the semaphore if it doesn't already exist.
+            // This operation is idempotent, so can be safely called
+            // by every consumer of the semaphore.
+
+            // Read script content from file
             let script_content = get_script("src/scripts/create_semaphore.lua");
-            let script_sha = get_script_sha(py, &script_content);
 
-            // Try to execute Redis script. If it hasn't been run before,
-            // we will receive a returned NoScriptError exception.
-            match redis.evalsha(&script_sha, 1, vec![capacity]) {
-                Ok(_) => (),
-                Err(err) => {
-                    // If it has not been run before, run it using `EVAL` instead.
-                    if err.is_instance_of::<redis::NoScriptError>(py) {
-                        redis.eval(&script_content, 1, vec![key, capacity])?;
-                    } else {
-                        return err;
-                    }
-                }
-            }
+            // Create script hash
+            // let script_sha = Python::with_gil(|py| get_script_sha(py, &script_content));
+            //
+            // println!("Script SHA is {}", script_sha);
 
-            // Wait for our turn - this waits non-blockingly until we're free to proceed
-            let start = now_millis();
-            redis.blpop(&ts.name, ts.max_sleep);
-
-            // Raise an exception if we waited too long
-            if ts.max_sleep != 0 && (now_millis() - start) > (ts.max_sleep as f64 * 1000.0) as u64 {
-                return Err(MaxSleepExceededError::new_err(
-                    "Max sleep exceeded when waiting for Semaphore".to_string(),
-                ));
-            };
-
-            debug!("Acquired semaphore");
+            // // Try to execute Redis script.
+            // // If the script has been called before, all we need to do is call `EVALSHA`
+            // // with the hash from above. Otherwise, we will need to call `EVAL` with the script
+            // // contents.
+            // // If the script *hasn't* been run before, we will receive a NoScriptError exception.
+            // match redis.evalsha(&script_sha, 1, vec![&ts.capacity.to_string()]) {
+            //     Ok(_) => (),
+            //     Err(err) => {
+            //         // If it hasn't been run before, fall back to `EVAL`.
+            //         if err.is_instance_of::<redis::NoScriptError>(py) {
+            //             redis.eval(&script_content, 1, vec![key, &ts.capacity.to_string()])?;
+            //         } else {
+            //             return err;
+            //         }
+            //     }
+            // }
+            //
+            // // We now know that the semaphore queue exists, so we proceed to call `BLPOP`
+            // // which will async block (i.e., non-blocking) until there is something in the
+            // // queue to pop.
+            // let result = match redis.blpop(&ts.name, ts.max_sleep) {
+            //     Some(_) => {
+            //         debug!("Acquired semaphore");
+            //         Ok(())
+            //     }
+            //     None => Err(MaxSleepExceededError::new_err(
+            //         "Max sleep exceeded when waiting for Semaphore".to_string(),
+            //     )),
+            // };
+            // result
             Ok(())
         })
     }
@@ -117,14 +133,12 @@ impl Semaphore {
         future_into_py(py, async {
             let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
 
-            let redis = Python::with_gil(|py| {
-                get_redis(py, &ts.redis_url)
-            });
+            // let redis = Python::with_gil(|py| Redis::new(py, &ts.redis_url));
 
-            // Define queue if it doesn't exist
-            let script_content = get_script("src/scripts/release_semaphore.lua");
-            let script_sha = get_script_sha(py, &script_content);
-            run_script(py, &script_content, &script_sha, &ts.name, &ts.capacity, redis);
+            // // Define queue if it doesn't exist
+            // let script_content = get_script("src/scripts/release_semaphore.lua");
+            // let script_sha = get_script_sha(py, &script_content);
+            //
 
             debug!("Released semaphore");
             Ok(())
