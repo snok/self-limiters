@@ -1,6 +1,6 @@
 [project]
 name = "self-limiters"
-description = "Provdes distributed async client rate limiters for using Redis"
+description = "Distributed async rate limiters using Redis, for client self-limiting"
 authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
 requires-python = ">=3.8"
