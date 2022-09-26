@@ -131,8 +131,6 @@ mod tests {
             "redis://username:@127.0.0.1",
             "redis://username:password@127.0.0.1",
             "redis://:password@127.0.0.1",
-            "rediss://127.0.0.1",
-            "rediss://test.com",
             "redis+unix:///127.0.0.1",
             "unix:///127.0.0.1",
         ] {
