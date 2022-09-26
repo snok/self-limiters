@@ -1,7 +1,7 @@
 use crate::_errors::SLError;
 use pyo3::prelude::PyModule;
 use pyo3::types::{IntoPyDict, PyString, PyTuple};
-use pyo3::{Py, PyAny, PyResult, Python};
+use pyo3::{Py, PyAny, PyObject, PyResult, Python};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -9,6 +9,7 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{SystemTime, UNIX_EPOCH};
+use pyo3_asyncio::TaskLocals;
 
 pub type TLResult<T> = Result<T, SLError>;
 
@@ -75,39 +76,29 @@ pub struct Redis {
     pub(crate) redis: Py<PyAny>,
 }
 
+pub fn redis_set(redis: &Py<PyAny>, py: Python, key: &str, value: i32) -> PyResult<PyObject> {
+    let r = redis.getattr(py, "set")?;
+    r.call1(py, (key, value))
+}
+
+pub async fn redis_get(redis: &Py<PyAny>, py: Python, locals: &TaskLocals, key: &str) -> PyResult<Option<i32>> {
+    let r = redis.getattr(py, "get")?;
+    let result:u32 = pyo3_asyncio::into_future_with_locals(
+        locals, r.call1(py, (key,))?.extract(py)?
+    )?.await?.extract(py)?;
+    println!("{:?}", &result);
+
+    // if result.is_none(py) {
+    //     Ok(None)
+    // } else {
+    //     // Parse i32 from string
+    //     let int_result = u32::from_str(&result.to_string()).unwrap();
+    //     Ok(Some(int_result))
+    // }
+    Ok(None)
+}
+
 impl Redis {
-    //
-    // pub fn set(self, key: &str, value: i32) {
-    //     self.redis
-    //         .getattr("set")
-    //         .unwrap()
-    //         .call1((key, value))
-    //         .unwrap();
-    // }
-    //
-    // pub fn get(self, key: &str) -> Option<i32> {
-    //     let result: Option<Vec<u8>> = self
-    //         .redis
-    //         .getattr("get")
-    //         .unwrap()
-    //         .call1((key,))
-    //         .unwrap()
-    //         .extract()
-    //         .unwrap();
-    //
-    //     if result.is_some() {
-    //         // Unpack Option
-    //         let temp = result.unwrap();
-    //         // Parse string from vector of bytes (Vec<u8>)
-    //         let decoded_result = String::from_utf8_lossy(&temp);
-    //         // Parse i32 from string
-    //         let int_result = i32::from_str(&decoded_result).unwrap();
-    //         Some(int_result)
-    //     } else {
-    //         None
-    //     }
-    // }
-    //
     // pub fn blpop(self, key: &str, max_sleep: u32) -> Option<()> {
     //     let f = self.redis.getattr("blpop").unwrap();
     //     f.call1((key, max_sleep)).unwrap();

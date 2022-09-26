@@ -1,8 +1,8 @@
 use crate::MaxSleepExceededError;
 use crate::_errors::SLError;
 use crate::_utils::{
-    get_script, get_script_sha, now_millis, receive_shared_state, send_shared_state, Redis,
-    REDIS_KEY_PREFIX,
+    get_script, get_script_sha, now_millis, receive_shared_state, redis_get, redis_set,
+    send_shared_state, Redis, REDIS_KEY_PREFIX,
 };
 use log::{debug, info};
 use pyo3::exceptions::PyTypeError;
@@ -23,15 +23,17 @@ pub struct ThreadState {
     pub(crate) name: String,
     pub(crate) capacity: u32,
     pub(crate) max_sleep: u32,
+    pub(crate) redis: Redis,
 }
 
 impl ThreadState {
-    fn from(slf: &PyRef<Semaphore>) -> Self {
+    fn from(slf: &PyRef<Semaphore>, redis: Redis) -> Self {
         Self {
             name: slf.name.clone(),
             capacity: slf.capacity,
             redis_url: slf.redis_url.clone(),
             max_sleep: slf.max_sleep,
+            redis,
         }
     }
 }
@@ -71,23 +73,28 @@ impl Semaphore {
     }
 
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        // Create struct containing an redis.asyncio.Redis class instance
+        let redis_instance: Py<PyAny> = PyModule::from_code(
+            py,
+            &format!(
+                "from redis.asyncio import Redis\nr = Redis.from_url('{}')",
+                slf.redis_url
+            ),
+            "",
+            "",
+        )?
+        .getattr("r")?
+        .into();
+
+        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(
+            &slf,
+            Redis {
+                redis: redis_instance,
+            },
+        ))?;
 
         future_into_py(py, async {
             // Collect thread state struct
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver).unwrap();
-
-            // Create struct containing an redis.asyncio.Redis class instance
-            let redis =
-                Python::with_gil(|py| {
-                    let r = PyModule::from_code(
-                    py,
-                    "from redis.asyncio import Redis; r = Redis.from_url('redis://127.0.0.1:6389')",
-                    "",
-                    ""
-                ).unwrap().getattr("r").into();
-                    Redis { redis: r }
-                });
 
             // Call Lua script, using redis class instance, to define
             // a queue for the semaphore if it doesn't already exist.
@@ -98,9 +105,18 @@ impl Semaphore {
             let script_content = get_script("src/scripts/create_semaphore.lua");
 
             // Create script hash
-            // let script_sha = Python::with_gil(|py| get_script_sha(py, &script_content));
-            //
-            // println!("Script SHA is {}", script_sha);
+            let script_sha = Python::with_gil(|py| get_script_sha(py, &script_content));
+
+            println!("Script SHA is {}", script_sha);
+
+            Python::with_gil(|py| {
+                let ts = receive_shared_state::<ThreadState, SLError>(receiver).unwrap();
+                let locals = pyo3_asyncio::TaskLocals::with_running_loop(py)?.copy_context(py)?;
+                redis_set(&ts.redis.redis, py, "test", 1)?;
+                let r = redis_get(&ts.redis.redis, py, &locals, "test").await?;
+                // println!("Saved value was {:?}", r);
+                Ok::<(), PyErr>(())
+            })?;
 
             // // Try to execute Redis script.
             // // If the script has been called before, all we need to do is call `EVALSHA`
@@ -138,9 +154,9 @@ impl Semaphore {
 
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        // let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
+            // let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
 
             // let redis = Python::with_gil(|py| Redis::new(py, &ts.redis_url));
 
