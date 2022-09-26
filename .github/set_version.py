@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Stolen from the pydantic-core repo
 import os
 import re
 import sys
@@ -6,16 +7,14 @@ from pathlib import Path
 
 
 def main(cargo_path_env_var='CARGO_PATH', version_env_vars=('VERSION', 'GITHUB_REF')) -> int:
-    cargo_path = os.getenv(cargo_path_env_var, 'Cargo.toml')
-    cargo_path = Path(cargo_path)
+    cargo_path = Path(os.getenv(cargo_path_env_var, 'Cargo.toml'))
     if not cargo_path.is_file():
         print(f'✖ path "{cargo_path}" does not exist')
         return 1
 
     version = None
     for var in version_env_vars:
-        version_ref = os.getenv(var)
-        if version_ref:
+        if version_ref := os.getenv(var):
             version = re.sub('^refs/tags/v*', '', version_ref.lower())
             break
     if not version:
