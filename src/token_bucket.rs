@@ -17,12 +17,12 @@ use crate::_utils::{
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
 pub(crate) struct ThreadState {
-    client: Client,
-    name: String,
     capacity: u32,
     frequency: f32,
     amount: u32,
     max_sleep: Duration,
+    client: Client,
+    name: String,
 }
 
 impl ThreadState {
@@ -31,8 +31,8 @@ impl ThreadState {
             capacity: slf.capacity,
             frequency: slf.refill_frequency,
             amount: slf.refill_amount,
-            client: slf.client.clone(),
             max_sleep: slf.max_sleep,
+            client: slf.client.clone(),
             name: slf.name.clone(),
         }
     }
@@ -47,14 +47,8 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResul
             max_sleep.as_secs()
         )));
     }
-    let ms = sleep_duration.as_millis();
 
-    if ms < 5 {
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    } else {
-        tokio::time::sleep(sleep_duration).await;
-    }
-
+    tokio::time::sleep(sleep_duration).await;
     Ok(())
 }
 
