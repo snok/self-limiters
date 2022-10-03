@@ -11,7 +11,7 @@ use crate::RedisError;
 use crate::_errors::SLError;
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url, TLResult, REDIS_KEY_PREFIX,
+    validate_redis_url, SLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -38,7 +38,7 @@ impl ThreadState {
     }
 }
 
-pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResult<()> {
+pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> SLResult<()> {
     if max_sleep.as_secs_f32() > 0.0 && sleep_duration > max_sleep {
         return Err(SLError::MaxSleepExceeded(format!(
             "Received wake up time in {} seconds, which is \
