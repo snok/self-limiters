@@ -1,20 +1,24 @@
+use std::io::Error;
+use std::num::ParseIntError;
+use std::string::FromUtf8Error;
+use std::sync::mpsc::{RecvError, SendError};
+
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
-use std::num::ParseIntError;
-use std::string::FromUtf8Error;
-use std::sync::mpsc::{RecvError, SendError};
 use tokio::task::JoinError;
 
-// Raised when redis::RedisError is raised downstream.
+// Raised when redis::RedisError is raised by the redis crate.
 create_exception!(self_limiters, RedisError, PyException);
 
-// Raised when we've slept for too long.
-// Useful to catch forever-growing queues.
+// Raised when we've slept for too long. Useful for catching forever-growing queues.
 create_exception!(self_limiters, MaxSleepExceededError, PyException);
 
 /// Enum containing all handled errors.
+/// This enables us to use the `?` operator on function calls to utilities
+/// that raise any of the mapped errors below, to automatically raise the
+/// appropriate mapped Python error.
 #[derive(Debug)]
 pub enum SLError {
     MaxSleepExceeded(String),
@@ -35,44 +39,30 @@ impl From<SLError> for PyErr {
     }
 }
 
+// redis::RedisError could be raised any time we perform a call to redis
 impl From<RedisLibError> for SLError {
     fn from(e: RedisLibError) -> Self {
         Self::Redis(e.to_string())
     }
 }
 
-impl From<ParseIntError> for SLError {
-    fn from(e: ParseIntError) -> Self {
-        Self::RuntimeError(e.to_string())
-    }
-}
-
-impl From<JoinError> for SLError {
-    fn from(e: JoinError) -> Self {
-        Self::RuntimeError(e.to_string())
-    }
-}
-
+// SendError could be raised when we pass data to a channel
 impl<T> From<SendError<T>> for SLError {
     fn from(e: SendError<T>) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }
 
+// RecvError could be raised when we read data from a channel
 impl From<RecvError> for SLError {
     fn from(e: RecvError) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }
 
-impl From<FromUtf8Error> for SLError {
-    fn from(e: FromUtf8Error) -> Self {
-        Self::RuntimeError(e.to_string())
-    }
-}
-
-impl From<std::io::Error> for SLError {
-    fn from(e: std::io::Error) -> Self {
+// std::io::Error could be raised when we read our Lua scripts
+impl From<Error> for SLError {
+    fn from(e: Error) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }
