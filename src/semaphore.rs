@@ -78,7 +78,7 @@ impl Semaphore {
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Define queue if it doesn't already exist
-            if get_script("src/scripts/create_semaphore.lua")
+            if get_script("src/scripts/create_semaphore.lua")?
                 .key(&ts.name)
                 .arg(ts.capacity)
                 .invoke_async(&mut connection)
@@ -121,7 +121,7 @@ impl Semaphore {
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Define queue if it doesn't exist
-            get_script("src/scripts/release_semaphore.lua")
+            get_script("src/scripts/release_semaphore.lua")?
                 .key(&ts.name)
                 .invoke_async(&mut connection)
                 .await

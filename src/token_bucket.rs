@@ -113,7 +113,7 @@ impl TokenBucket {
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Retrieve slot
-            let slot: u64 = get_script("src/scripts/schedule.lua")
+            let slot: u64 = get_script("src/scripts/schedule.lua")?
                 .key(&ts.name)
                 .arg(ts.capacity) // capacity
                 .arg((ts.frequency * 1000.0) as u64) // refill rate in ms

@@ -70,3 +70,9 @@ impl From<FromUtf8Error> for SLError {
         Self::RuntimeError(e.to_string())
     }
 }
+
+impl From<std::io::Error> for SLError {
+    fn from(e: std::io::Error) -> Self {
+        Self::RuntimeError(e.to_string())
+    }
+}

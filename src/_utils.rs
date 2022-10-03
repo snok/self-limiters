@@ -1,14 +1,14 @@
+use super::semaphore::ThreadState as SemaphoreThreadState;
+use super::token_bucket::ThreadState as TokenBucketThreadState;
 use crate::_errors::SLError;
 use redis::aio::Connection;
-use redis::{parse_redis_url, Client, Script, AsyncCommands};
+use redis::{parse_redis_url, AsyncCommands, Client, Script};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use super::token_bucket::ThreadState as TokenBucketThreadState;
-use super::semaphore::ThreadState as SemaphoreThreadState;
 
 pub type TLResult<T> = Result<T, SLError>;
 
@@ -24,8 +24,6 @@ pub fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
     Ok(receiver)
 }
 
-
-
 /// Read data from channel
 pub fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
     receiver: Receiver<T>,
@@ -33,10 +31,9 @@ pub fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
     Ok(receiver.recv()?)
 }
 
-
 #[test]
 fn test_send_and_receive_via_channel_semaphore_threaded() -> TLResult<()> {
-    let client = Client::open("redis://127.0.0.1:6389").unwrap();
+    let client = Client::open("redis://127.0.0.1:6389")?;
     let name = String::from("test");
     let capacity = 1;
     let max_sleep = 0;
@@ -47,13 +44,10 @@ fn test_send_and_receive_via_channel_semaphore_threaded() -> TLResult<()> {
         name: name.to_owned(),
         capacity: capacity.to_owned(),
         max_sleep: max_sleep.to_owned(),
-    })
-    .unwrap();
-    let copied_ts = thread::spawn(move || {
-        receive_shared_state::<SemaphoreThreadState, SLError>(receiver).unwrap()
-    })
-    .join()
-    .unwrap();
+    })?;
+    let copied_ts =
+        thread::spawn(move || receive_shared_state::<SemaphoreThreadState, SLError>(receiver).unwrap())
+            .join().unwrap();
     assert_eq!(copied_ts.name, name);
     assert_eq!(copied_ts.capacity, capacity);
     Ok(())
@@ -61,7 +55,7 @@ fn test_send_and_receive_via_channel_semaphore_threaded() -> TLResult<()> {
 
 #[test]
 fn test_send_and_receive_via_channel_token_bucket_threaded() -> TLResult<()> {
-    let client = Client::open("redis://127.0.0.1:6389").unwrap();
+    let client = Client::open("redis://127.0.0.1:6389")?;
     let name = String::from("test");
     let capacity = 1;
     let max_sleep = Duration::from_millis(10);
@@ -69,19 +63,17 @@ fn test_send_and_receive_via_channel_token_bucket_threaded() -> TLResult<()> {
     let amount = 1;
 
     // Send and receive w/o thread
-    let receiver =
-        send_shared_state::<TokenBucketThreadState, SLError>(TokenBucketThreadState {
-            client,
-            name: name.to_owned(),
-            capacity: capacity.to_owned(),
-            max_sleep: max_sleep.to_owned(),
-            frequency: frequency.to_owned(),
-            amount: amount.to_owned(),
-        })
-        .unwrap();
+    let receiver = send_shared_state::<TokenBucketThreadState, SLError>(TokenBucketThreadState {
+        client,
+        name: name.to_owned(),
+        capacity: capacity.to_owned(),
+        max_sleep: max_sleep.to_owned(),
+        frequency: frequency.to_owned(),
+        amount: amount.to_owned(),
+    }).unwrap();
     thread::spawn(move || {
-        let copied_ts =
-            receive_shared_state::<TokenBucketThreadState, SLError>(receiver).unwrap();
+        let copied_ts = receive_shared_state::<TokenBucketThreadState, SLError>(receiver)
+            .unwrap();
         assert_eq!(copied_ts.name, name);
         assert_eq!(copied_ts.capacity, capacity);
         assert_eq!(copied_ts.max_sleep, max_sleep);
@@ -90,7 +82,6 @@ fn test_send_and_receive_via_channel_token_bucket_threaded() -> TLResult<()> {
     });
     Ok(())
 }
-
 
 /// Open Redis connection
 pub async fn open_client_connection(client: &Client) -> Result<Connection, SLError> {
@@ -102,7 +93,7 @@ pub async fn open_client_connection(client: &Client) -> Result<Connection, SLErr
 
 #[tokio::test]
 async fn test_open_client_connection() -> TLResult<()> {
-    let client = Client::open("redis://127.0.0.1:6389").unwrap();
+    let client = Client::open("redis://127.0.0.1:6389")?;
     let mut connection = open_client_connection(&client).await?;
     connection.set("test", 2).await?;
     let result: i32 = connection.get("test").await?;
@@ -110,20 +101,19 @@ async fn test_open_client_connection() -> TLResult<()> {
     Ok(())
 }
 
-
-pub fn get_script(path: &str) -> Script {
+pub fn get_script(path: &str) -> TLResult<Script> {
     let path = Path::new(path);
-    let mut file = File::open(path).unwrap();
+    let mut file = File::open(path)?;
     let mut content = String::new();
-    file.read_to_string(&mut content).unwrap();
-    Script::new(&content)
+    file.read_to_string(&mut content)?;
+    Ok(Script::new(&content))
 }
 
 #[test]
 fn test_get_script() -> TLResult<()> {
-    get_script("src/scripts/schedule.lua");
-    get_script("src/scripts/create_semaphore.lua");
-    get_script("src/scripts/release_semaphore.lua");
+    get_script("src/scripts/schedule.lua")?;
+    get_script("src/scripts/create_semaphore.lua")?;
+    get_script("src/scripts/release_semaphore.lua")?;
     Ok(())
 }
 
@@ -134,8 +124,6 @@ pub fn now_millis() -> u64 {
         .unwrap()
         .as_millis() as u64
 }
-
-
 
 #[tokio::test]
 async fn test_now_millis() -> TLResult<()> {
@@ -166,7 +154,6 @@ pub fn validate_redis_url(redis_url: Option<&str>) -> TLResult<Client> {
 
     Ok(client)
 }
-
 
 #[test]
 fn test_validate_redis_urls() {
