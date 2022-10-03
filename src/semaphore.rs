@@ -1,6 +1,5 @@
 extern crate redis;
 
-use crate::_errors::SLError;
 use crate::{MaxSleepExceededError, RedisError};
 use log::{debug, info};
 use pyo3::prelude::*;
@@ -68,11 +67,11 @@ impl Semaphore {
     }
 
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
             // Retrieve thread state struct
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
+            let ts = receive_shared_state(receiver)?;
 
             // Connect to redis
             let mut connection = open_client_connection(&ts.client).await?;
@@ -113,9 +112,9 @@ impl Semaphore {
     /// Return capacity to the Semaphore on exit.
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state(ThreadState::from(&slf))?;
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
+            let ts = receive_shared_state(receiver)?;
 
             // Connect to redis
             let mut connection = open_client_connection(&ts.client).await?;

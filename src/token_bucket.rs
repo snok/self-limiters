@@ -104,10 +104,10 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState>(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
+            let ts = receive_shared_state(receiver)?;
 
             // Connect to redis
             let mut connection = open_client_connection(&ts.client).await?;

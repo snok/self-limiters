@@ -1,13 +1,10 @@
 use std::io::Error;
-use std::num::ParseIntError;
-use std::string::FromUtf8Error;
 use std::sync::mpsc::{RecvError, SendError};
 
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
-use tokio::task::JoinError;
 
 // Raised when redis::RedisError is raised by the redis crate.
 create_exception!(self_limiters, RedisError, PyException);

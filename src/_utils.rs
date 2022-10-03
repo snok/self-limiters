@@ -10,24 +10,21 @@ use std::sync::mpsc::{channel, Receiver};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+// Result which returns SLError which is convertible to PyErr
 pub type SLResult<T> = Result<T, SLError>;
 
 const REDIS_DEFAULT_URL: &str = "redis://127.0.0.1:6379";
 pub const REDIS_KEY_PREFIX: &str = "__self-limiters:";
 
 /// Open a channel and send some data
-pub fn send_shared_state<T, E: From<std::sync::mpsc::SendError<T>>>(
-    ts: T,
-) -> Result<Receiver<T>, E> {
+pub fn send_shared_state<T>(ts: T) -> SLResult<Receiver<T>> {
     let (sender, receiver) = channel();
     sender.send(ts)?;
     Ok(receiver)
 }
 
 /// Read data from channel
-pub fn receive_shared_state<T, E: From<std::sync::mpsc::RecvError>>(
-    receiver: Receiver<T>,
-) -> Result<T, E> {
+pub fn receive_shared_state<T>(receiver: Receiver<T>) -> SLResult<T> {
     Ok(receiver.recv()?)
 }
 
@@ -39,17 +36,15 @@ fn test_send_and_receive_via_channel_semaphore_threaded() -> SLResult<()> {
     let max_sleep = 0;
 
     // Send and receive w/o thread
-    let receiver = send_shared_state::<SemaphoreThreadState, SLError>(SemaphoreThreadState {
+    let receiver = send_shared_state(SemaphoreThreadState {
         client,
         name: name.to_owned(),
         capacity: capacity.to_owned(),
         max_sleep: max_sleep.to_owned(),
     })?;
-    let copied_ts = thread::spawn(move || {
-        receive_shared_state::<SemaphoreThreadState, SLError>(receiver).unwrap()
-    })
-    .join()
-    .unwrap();
+    let copied_ts = thread::spawn(move || receive_shared_state(receiver).unwrap())
+        .join()
+        .unwrap();
     assert_eq!(copied_ts.name, name);
     assert_eq!(copied_ts.capacity, capacity);
     Ok(())
@@ -65,7 +60,7 @@ fn test_send_and_receive_via_channel_token_bucket_threaded() -> SLResult<()> {
     let amount = 1;
 
     // Send and receive w/o thread
-    let receiver = send_shared_state::<TokenBucketThreadState, SLError>(TokenBucketThreadState {
+    let receiver = send_shared_state(TokenBucketThreadState {
         client,
         name: name.to_owned(),
         capacity: capacity.to_owned(),
@@ -75,7 +70,7 @@ fn test_send_and_receive_via_channel_token_bucket_threaded() -> SLResult<()> {
     })
     .unwrap();
     thread::spawn(move || {
-        let copied_ts = receive_shared_state::<TokenBucketThreadState, SLError>(receiver).unwrap();
+        let copied_ts = receive_shared_state(receiver).unwrap();
         assert_eq!(copied_ts.name, name);
         assert_eq!(copied_ts.capacity, capacity);
         assert_eq!(copied_ts.max_sleep, max_sleep);
