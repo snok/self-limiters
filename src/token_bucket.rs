@@ -17,12 +17,12 @@ use crate::_utils::{
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
 pub(crate) struct ThreadState {
-    capacity: u32,
-    frequency: f32,
-    amount: u32,
-    max_sleep: Duration,
-    client: Client,
-    name: String,
+    pub(crate) capacity: u32,
+    pub(crate) frequency: f32,
+    pub(crate) amount: u32,
+    pub(crate) max_sleep: Duration,
+    pub(crate) client: Client,
+    pub(crate) name: String,
 }
 
 impl ThreadState {

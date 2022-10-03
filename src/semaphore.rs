@@ -16,10 +16,10 @@ use crate::_utils::{
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
 pub(crate) struct ThreadState {
-    client: Client,
-    name: String,
-    capacity: u32,
-    max_sleep: u32,
+    pub(crate) client: Client,
+    pub(crate) name: String,
+    pub(crate) capacity: u32,
+    pub(crate) max_sleep: u32,
 }
 
 impl ThreadState {
