@@ -25,9 +25,9 @@ pub(crate) struct ThreadState {
 impl ThreadState {
     fn from(slf: &PyRef<Semaphore>) -> Self {
         Self {
+            client: slf.client.clone(),
             name: slf.name.clone(),
             capacity: slf.capacity,
-            client: slf.client.clone(),
             max_sleep: slf.max_sleep,
         }
     }
@@ -110,6 +110,7 @@ impl Semaphore {
         })
     }
 
+    /// Return capacity to the Semaphore on exit.
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
         let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
