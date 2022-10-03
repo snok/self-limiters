@@ -32,9 +32,9 @@ impl ThreadState {
     }
 }
 
-/// Async context manager useful for enforcing police client traffic
-/// when dealing with a concurrency-based external rate limit. For example,
-/// when you can only have 2 active requests simultaneously.
+/// Async context manager useful for controlling client traffic
+/// in situations where you need to limit traffic to `n` requests concurrently.
+/// For example, when you can only have 2 active requests simultaneously.
 #[pyclass]
 #[pyo3(name = "Semaphore")]
 #[pyo3(module = "self_limiters")]

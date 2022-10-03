@@ -52,10 +52,9 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> SLResul
     Ok(())
 }
 
-/// Async context manager useful for enforcing police client traffic
-/// when dealing with a time-based external rate limit. For example,
-/// when you can only send 1 request per minute, or another variation
-/// of that nature.
+/// Async context manager useful for controlling client traffic
+/// in situations where you need to limit traffic to `n` requests per `m` unit of time.
+/// For example, when you can only send 1 request per minute.
 #[pyclass]
 #[pyo3(name = "TokenBucket")]
 #[pyo3(module = "self_limiters")]
