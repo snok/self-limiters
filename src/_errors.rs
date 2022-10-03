@@ -1,5 +1,6 @@
 use std::io::Error;
 use std::sync::mpsc::{RecvError, SendError};
+use std::time::SystemTimeError;
 
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
@@ -60,6 +61,13 @@ impl From<RecvError> for SLError {
 // std::io::Error could be raised when we read our Lua scripts
 impl From<Error> for SLError {
     fn from(e: Error) -> Self {
+        Self::RuntimeError(e.to_string())
+    }
+}
+
+// SystemTimeError could be raised when calling SystemTime.now()
+impl From<SystemTimeError> for SLError {
+    fn from(e: SystemTimeError) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }

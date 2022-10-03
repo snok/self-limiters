@@ -81,11 +81,8 @@ fn test_send_and_receive_via_channel_token_bucket_threaded() -> SLResult<()> {
 }
 
 /// Open Redis connection
-pub async fn open_client_connection(client: &Client) -> Result<Connection, SLError> {
-    match client.get_async_connection().await {
-        Ok(connection) => Ok(connection),
-        Err(e) => Err(SLError::Redis(e.to_string())),
-    }
+pub async fn open_client_connection(client: &Client) -> SLResult<Connection> {
+    Ok(client.get_async_connection().await?)
 }
 
 #[tokio::test]
@@ -114,20 +111,17 @@ fn test_get_script() -> SLResult<()> {
     Ok(())
 }
 
-pub fn now_millis() -> u64 {
-    // Beware: This will fail with an overflow error in 500 thousand years
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
+pub fn now_millis() -> SLResult<u64> {
+    // Beware: This will overflow in 500 thousand years
+    Ok(SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64)
 }
 
 #[tokio::test]
 async fn test_now_millis() -> SLResult<()> {
-    let now = now_millis();
+    let now = now_millis()?;
     tokio::time::sleep(Duration::from_millis(30)).await;
-    assert!(now + 30 <= now_millis());
-    assert!(now + 33 >= now_millis());
+    assert!(now + 30 <= now_millis()?);
+    assert!(now + 33 >= now_millis()?);
     Ok(())
 }
 

@@ -122,7 +122,7 @@ impl TokenBucket {
                 .await
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
-            let now = now_millis();
+            let now = now_millis()?;
             let sleep_duration = {
                 if slot <= now {
                     Duration::from_millis(0)

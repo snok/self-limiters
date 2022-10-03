@@ -91,14 +91,15 @@ impl Semaphore {
             }
 
             // Wait for our turn - this waits non-blockingly until we're free to proceed
-            let start = now_millis();
+            let start = now_millis()?;
             connection
                 .blpop::<&str, Option<()>>(&ts.name, ts.max_sleep as usize)
                 .await
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
             // Raise an exception if we waited too long
-            if ts.max_sleep != 0 && (now_millis() - start) > (ts.max_sleep as f64 * 1000.0) as u64 {
+            if ts.max_sleep != 0 && (now_millis()? - start) > (ts.max_sleep as f64 * 1000.0) as u64
+            {
                 return Err(MaxSleepExceededError::new_err(
                     "Max sleep exceeded when waiting for Semaphore".to_string(),
                 ));
