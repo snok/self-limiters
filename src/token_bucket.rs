@@ -1,3 +1,4 @@
+use log::debug;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
@@ -94,6 +95,10 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
         )));
     }
 
+    debug!(
+        "Retrieved slot. Sleeping for {}.",
+        sleep_duration.as_secs_f32()
+    );
     tokio::time::sleep(sleep_duration).await;
 
     Ok(())
