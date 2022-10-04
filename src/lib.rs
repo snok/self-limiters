@@ -9,8 +9,8 @@ use crate::semaphore::Semaphore;
 mod semaphore;
 
 mod _errors;
-mod _utils;
 mod _tests;
+mod _utils;
 mod token_bucket;
 
 #[pymodule]

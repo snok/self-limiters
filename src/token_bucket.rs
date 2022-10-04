@@ -88,7 +88,6 @@ impl TokenBucket {
                 "Refill frequency must be greater than 0",
             ));
         }
-
         Ok(Self {
             capacity,
             refill_amount,
