@@ -104,7 +104,7 @@ async def r(sleep, **kw):
     'n,duration',
     [
         (100, 1),
-        (1000, 3),
+        (1000, 4),
     ],
 )
 async def test_high_load(n, duration):

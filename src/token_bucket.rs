@@ -11,18 +11,18 @@ use crate::RedisError;
 use crate::_errors::SLError;
 use crate::_utils::{
     get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url, TLResult, REDIS_KEY_PREFIX,
+    validate_redis_url, SLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
-pub struct ThreadState {
-    pub(crate) client: Client,
-    pub(crate) name: String,
+pub(crate) struct ThreadState {
     pub(crate) capacity: u32,
     pub(crate) frequency: f32,
     pub(crate) amount: u32,
-    pub(crate) max_sleep: Duration,
+    pub(crate) max_sleep: f64,
+    pub(crate) client: Client,
+    pub(crate) name: String,
 }
 
 impl ThreadState {
@@ -31,14 +31,14 @@ impl ThreadState {
             capacity: slf.capacity,
             frequency: slf.refill_frequency,
             amount: slf.refill_amount,
-            client: slf.client.clone(),
             max_sleep: slf.max_sleep,
+            client: slf.client.clone(),
             name: slf.name.clone(),
         }
     }
 }
 
-pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResult<()> {
+pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> SLResult<()> {
     if max_sleep.as_secs_f32() > 0.0 && sleep_duration > max_sleep {
         return Err(SLError::MaxSleepExceeded(format!(
             "Received wake up time in {} seconds, which is \
@@ -47,21 +47,14 @@ pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> TLResul
             max_sleep.as_secs()
         )));
     }
-    let ms = sleep_duration.as_millis();
 
-    if ms < 5 {
-        tokio::time::sleep(Duration::from_millis(5)).await;
-    } else {
-        tokio::time::sleep(sleep_duration).await;
-    }
-
+    tokio::time::sleep(sleep_duration).await;
     Ok(())
 }
 
-/// Async context manager useful for enforcing police client traffic
-/// when dealing with a time-based external rate limit. For example,
-/// when you can only send 1 request per minute, or another variation
-/// of that nature.
+/// Async context manager useful for controlling client traffic
+/// in situations where you need to limit traffic to `n` requests per `m` unit of time.
+/// For example, when you can only send 1 request per minute.
 #[pyclass]
 #[pyo3(name = "TokenBucket")]
 #[pyo3(module = "self_limiters")]
@@ -74,7 +67,7 @@ pub struct TokenBucket {
     refill_amount: u32,
     #[pyo3(get)]
     name: String,
-    max_sleep: Duration,
+    max_sleep: f64,
     client: Client,
 }
 
@@ -95,12 +88,11 @@ impl TokenBucket {
                 "Refill frequency must be greater than 0",
             ));
         }
-
         Ok(Self {
             capacity,
             refill_amount,
             refill_frequency,
-            max_sleep: Duration::from_secs((max_sleep.unwrap_or(0.0)) as u64),
+            max_sleep: max_sleep.unwrap_or(0.0),
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             client: validate_redis_url(redis_url)?,
         })
@@ -110,16 +102,16 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState, SLError>(ThreadState::from(&slf))?;
+        let receiver = send_shared_state::<ThreadState>(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            let ts = receive_shared_state::<ThreadState, SLError>(receiver)?;
+            let ts = receive_shared_state(receiver)?;
 
             // Connect to redis
             let mut connection = open_client_connection(&ts.client).await?;
 
             // Retrieve slot
-            let slot: u64 = get_script("src/scripts/schedule.lua")
+            let slot: u64 = get_script("src/scripts/schedule.lua")?
                 .key(&ts.name)
                 .arg(ts.capacity) // capacity
                 .arg((ts.frequency * 1000.0) as u64) // refill rate in ms
@@ -128,7 +120,7 @@ impl TokenBucket {
                 .await
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
-            let now = now_millis();
+            let now = now_millis()?;
             let sleep_duration = {
                 if slot <= now {
                     Duration::from_millis(0)
@@ -136,7 +128,7 @@ impl TokenBucket {
                     Duration::from_millis((slot - now) as u64)
                 }
             };
-            sleep_for(sleep_duration, ts.max_sleep).await?;
+            sleep_for(sleep_duration, Duration::from_secs_f64(ts.max_sleep)).await?;
             Ok(())
         })
     }
