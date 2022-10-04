@@ -20,7 +20,7 @@ pub(crate) struct ThreadState {
     pub(crate) capacity: u32,
     pub(crate) frequency: f32,
     pub(crate) amount: u32,
-    pub(crate) max_sleep: Duration,
+    pub(crate) max_sleep: f64,
     pub(crate) client: Client,
     pub(crate) name: String,
 }
@@ -67,7 +67,7 @@ pub struct TokenBucket {
     refill_amount: u32,
     #[pyo3(get)]
     name: String,
-    max_sleep: Duration,
+    max_sleep: f64,
     client: Client,
 }
 
@@ -93,7 +93,7 @@ impl TokenBucket {
             capacity,
             refill_amount,
             refill_frequency,
-            max_sleep: Duration::from_secs((max_sleep.unwrap_or(0.0)) as u64),
+            max_sleep: max_sleep.unwrap_or(0.0),
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             client: validate_redis_url(redis_url)?,
         })
@@ -129,7 +129,7 @@ impl TokenBucket {
                     Duration::from_millis((slot - now) as u64)
                 }
             };
-            sleep_for(sleep_duration, ts.max_sleep).await?;
+            sleep_for(sleep_duration, Duration::from_secs_f64(ts.max_sleep)).await?;
             Ok(())
         })
     }

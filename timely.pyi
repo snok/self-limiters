@@ -9,7 +9,7 @@ class TokenBucket:
         refill_frequency: float,
         refill_amount: int,
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
-        max_sleep: Optional[float] = None,  # will be set to 0 if None
+        max_sleep: Optional[float] = None,  # will be set to 0.0 if None. In seconds.
     ) -> None: ...
 
     capacity: int
@@ -27,7 +27,7 @@ class Semaphore:
         self,
         name: str,
         capacity: int,
-        max_sleep: Optional[int] = None,  # Set to 0 when None is passed
+        max_sleep: Optional[float] = None,  # Set to 0.0 when None is passed. In seconds.
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
     ) -> None: ...
 
