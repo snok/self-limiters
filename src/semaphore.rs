@@ -119,7 +119,7 @@ impl Semaphore {
         })
     }
 
-    fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
+    fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
@@ -129,7 +129,7 @@ impl Semaphore {
 
     /// Return capacity to the Semaphore on exit.
     #[args(_a = "*")]
-    fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
+    fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
         future_into_py(py, async { Ok(release_semaphore(receiver).await?) })
     }
