@@ -20,7 +20,7 @@ pub(crate) struct ThreadState {
     pub(crate) capacity: u32,
     pub(crate) frequency: f32,
     pub(crate) amount: u32,
-    pub(crate) max_sleep: f64,
+    pub(crate) max_sleep: f32,
     pub(crate) client: Client,
     pub(crate) name: String,
 }
@@ -67,7 +67,7 @@ pub struct TokenBucket {
     refill_amount: u32,
     #[pyo3(get)]
     name: String,
-    max_sleep: f64,
+    max_sleep: f32,
     client: Client,
 }
 
@@ -81,7 +81,7 @@ impl TokenBucket {
         refill_frequency: f32,
         refill_amount: u32,
         redis_url: Option<&str>,
-        max_sleep: Option<f64>,
+        max_sleep: Option<f32>,
     ) -> PyResult<Self> {
         if refill_frequency <= 0.0 {
             return Err(PyValueError::new_err(
@@ -102,9 +102,11 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        let receiver = send_shared_state::<ThreadState>(ThreadState::from(&slf))?;
+        // Send class state to another thread, by using a channel
+        let receiver = send_shared_state(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
+            // Receive class state
             let ts = receive_shared_state(receiver)?;
 
             // Connect to redis
@@ -114,7 +116,7 @@ impl TokenBucket {
             let slot: u64 = get_script("src/scripts/schedule.lua")?
                 .key(&ts.name)
                 .arg(ts.capacity) // capacity
-                .arg((ts.frequency * 1000.0) as u64) // refill rate in ms
+                .arg(ts.frequency * 1000.0) // refill rate in ms
                 .arg(ts.amount) // refill amount
                 .invoke_async(&mut connection)
                 .await
@@ -122,13 +124,17 @@ impl TokenBucket {
 
             let now = now_millis()?;
             let sleep_duration = {
+                // This might happen at very low refill frequencies.
+                // Current handling isn't robust enough to ensure
+                // exactly uniform traffic when this happens. Might be
+                // something worth looking at more in the future, if needed.
                 if slot <= now {
                     Duration::from_millis(0)
                 } else {
-                    Duration::from_millis((slot - now) as u64)
+                    Duration::from_millis(slot - now)
                 }
             };
-            sleep_for(sleep_duration, Duration::from_secs_f64(ts.max_sleep)).await?;
+            sleep_for(sleep_duration, Duration::from_secs_f32(ts.max_sleep)).await?;
             Ok(())
         })
     }

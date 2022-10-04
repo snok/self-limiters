@@ -18,7 +18,7 @@ pub(crate) struct ThreadState {
     pub(crate) client: Client,
     pub(crate) name: String,
     pub(crate) capacity: u32,
-    pub(crate) max_sleep: f64,
+    pub(crate) max_sleep: f32,
 }
 
 impl ThreadState {
@@ -44,7 +44,7 @@ pub struct Semaphore {
     #[pyo3(get)]
     name: String,
     #[pyo3(get)]
-    max_sleep: f64,
+    max_sleep: f32,
     client: Client,
 }
 
@@ -55,7 +55,7 @@ impl Semaphore {
     fn new(
         name: String,
         capacity: u32,
-        max_sleep: Option<f64>,
+        max_sleep: Option<f32>,
         redis_url: Option<&str>,
     ) -> PyResult<Self> {
         Ok(Self {
@@ -98,9 +98,7 @@ impl Semaphore {
                 .map_err(|e| RedisError::new_err(e.to_string()))?;
 
             // Raise an exception if we waited too long
-            if ts.max_sleep != 0.0
-                && (now_millis()? - start) > (ts.max_sleep as f64 * 1000.0) as u64
-            {
+            if ts.max_sleep != 0.0 && (now_millis()? - start) > (ts.max_sleep * 1000.0) as u64 {
                 return Err(MaxSleepExceededError::new_err(
                     "Max sleep exceeded when waiting for Semaphore".to_string(),
                 ));

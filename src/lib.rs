@@ -23,6 +23,5 @@ fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
     m.add("RedisError", py.get_type::<RedisError>())?;
     m.add_class::<Semaphore>()?;
     m.add_class::<TokenBucket>()?;
-
     Ok(())
 }
