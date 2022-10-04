@@ -23,7 +23,7 @@ mod tests {
             capacity: capacity.to_owned(),
             max_sleep: max_sleep.to_owned(),
         })?;
-        let copied_ts = thread::spawn(move || receive_shared_state(receiver).unwrap())
+        let copied_ts = thread::spawn(move || receiver.recv().unwrap())
             .join()
             .unwrap();
         assert_eq!(copied_ts.name, name);
@@ -51,23 +51,13 @@ mod tests {
         })
         .unwrap();
         thread::spawn(move || {
-            let copied_ts = receive_shared_state(receiver).unwrap();
+            let copied_ts = receiver.recv().unwrap();
             assert_eq!(copied_ts.name, name);
             assert_eq!(copied_ts.capacity, capacity);
             assert_eq!(copied_ts.max_sleep, max_sleep);
             assert_eq!(copied_ts.frequency, frequency);
             assert_eq!(copied_ts.amount, amount);
         });
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_open_client_connection() -> SLResult<()> {
-        let client = Client::open("redis://127.0.0.1:6389")?;
-        let mut connection = open_client_connection(&client).await?;
-        connection.set("test", 2).await?;
-        let result: i32 = connection.get("test").await?;
-        assert_eq!(result, 2);
         Ok(())
     }
 

@@ -1,15 +1,15 @@
 extern crate redis;
 
-use crate::{MaxSleepExceededError, RedisError};
+use crate::_errors::SLError;
 use log::{debug, info};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Client};
+use std::sync::mpsc::Receiver;
 
 use crate::_utils::{
-    get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url, REDIS_KEY_PREFIX,
+    get_script, now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -48,6 +48,59 @@ pub struct Semaphore {
     client: Client,
 }
 
+async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
+    // Retrieve thread state struct
+    let ts = receiver.recv()?;
+
+    // Connect to redis
+    let mut connection = ts.client.get_async_connection().await?;
+
+    // Define queue if it doesn't already exist
+    if get_script("src/scripts/create_semaphore.lua")?
+        .key(&ts.name)
+        .arg(ts.capacity)
+        .invoke_async(&mut connection)
+        .await?
+    {
+        info!(
+            "Created new semaphore queue with a capacity of {}",
+            &ts.capacity
+        );
+    }
+
+    // Wait for our turn - this waits non-blockingly until we're free to proceed
+    let start = now_millis()?;
+    connection
+        .blpop::<&str, Option<()>>(&ts.name, ts.max_sleep as usize)
+        .await?;
+
+    // Raise an exception if we waited too long
+    if ts.max_sleep > 0.0 && (now_millis()? - start) > (ts.max_sleep * 1000.0) as u64 {
+        return Err(SLError::MaxSleepExceeded(
+            "Max sleep exceeded when waiting for Semaphore".to_string(),
+        ));
+    };
+
+    debug!("Acquired semaphore");
+    Ok(())
+}
+
+async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
+    let ts = receiver.recv()?;
+
+    // Connect to redis
+    let mut connection = ts.client.get_async_connection().await?;
+
+    // Define queue if it doesn't exist
+    get_script("src/scripts/release_semaphore.lua")?
+        .key(&ts.name)
+        .invoke_async(&mut connection)
+        .await?;
+
+    debug!("Released semaphore");
+    Ok(())
+}
+
 #[pymethods]
 impl Semaphore {
     /// Create a new class instance.
@@ -70,42 +123,7 @@ impl Semaphore {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
 
         future_into_py(py, async {
-            // Retrieve thread state struct
-            let ts = receive_shared_state(receiver)?;
-
-            // Connect to redis
-            let mut connection = open_client_connection(&ts.client).await?;
-
-            // Define queue if it doesn't already exist
-            if get_script("src/scripts/create_semaphore.lua")?
-                .key(&ts.name)
-                .arg(ts.capacity)
-                .invoke_async(&mut connection)
-                .await
-                .map_err(|e| RedisError::new_err(e.to_string()))?
-            {
-                info!(
-                    "Created new semaphore queue with a capacity of {}",
-                    &ts.capacity
-                );
-            }
-
-            // Wait for our turn - this waits non-blockingly until we're free to proceed
-            let start = now_millis()?;
-            connection
-                .blpop::<&str, Option<()>>(&ts.name, ts.max_sleep as usize)
-                .await
-                .map_err(|e| RedisError::new_err(e.to_string()))?;
-
-            // Raise an exception if we waited too long
-            if ts.max_sleep != 0.0 && (now_millis()? - start) > (ts.max_sleep * 1000.0) as u64 {
-                return Err(MaxSleepExceededError::new_err(
-                    "Max sleep exceeded when waiting for Semaphore".to_string(),
-                ));
-            };
-
-            debug!("Acquired semaphore");
-            Ok(())
+            Ok(create_and_acquire_semaphore(receiver).await?)
         })
     }
 
@@ -113,22 +131,7 @@ impl Semaphore {
     #[args(_a = "*")]
     fn __aexit__<'a>(slf: PyRef<'_, Self>, py: Python<'a>, _a: &'a PyTuple) -> PyResult<&'a PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
-        future_into_py(py, async {
-            let ts = receive_shared_state(receiver)?;
-
-            // Connect to redis
-            let mut connection = open_client_connection(&ts.client).await?;
-
-            // Define queue if it doesn't exist
-            get_script("src/scripts/release_semaphore.lua")?
-                .key(&ts.name)
-                .invoke_async(&mut connection)
-                .await
-                .map_err(|e| RedisError::new_err(e.to_string()))?;
-
-            debug!("Released semaphore");
-            Ok(())
-        })
+        future_into_py(py, async { Ok(release_semaphore(receiver).await?) })
     }
 
     fn __repr__(&self) -> String {
