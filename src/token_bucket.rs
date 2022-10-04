@@ -1,3 +1,4 @@
+use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use pyo3::exceptions::PyValueError;
@@ -7,11 +8,9 @@ use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::Client;
 
-use crate::RedisError;
 use crate::_errors::SLError;
 use crate::_utils::{
-    get_script, now_millis, open_client_connection, receive_shared_state, send_shared_state,
-    validate_redis_url, SLResult, REDIS_KEY_PREFIX,
+    get_script, now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -38,20 +37,6 @@ impl ThreadState {
     }
 }
 
-pub async fn sleep_for(sleep_duration: Duration, max_sleep: Duration) -> SLResult<()> {
-    if max_sleep.as_secs_f32() > 0.0 && sleep_duration > max_sleep {
-        return Err(SLError::MaxSleepExceeded(format!(
-            "Received wake up time in {} seconds, which is \
-            greater or equal to the specified max sleep of {} seconds",
-            sleep_duration.as_secs(),
-            max_sleep.as_secs()
-        )));
-    }
-
-    tokio::time::sleep(sleep_duration).await;
-    Ok(())
-}
-
 /// Async context manager useful for controlling client traffic
 /// in situations where you need to limit traffic to `n` requests per `m` unit of time.
 /// For example, when you can only send 1 request per minute.
@@ -69,6 +54,49 @@ pub struct TokenBucket {
     name: String,
     max_sleep: f32,
     client: Client,
+}
+
+async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
+    // Receive class state
+    let ts = receiver.recv()?;
+
+    // Connect to redis
+    let mut connection = ts.client.get_async_connection().await?;
+
+    // Retrieve slot
+    let slot: u64 = get_script("src/scripts/schedule.lua")?
+        .key(&ts.name)
+        .arg(ts.capacity) // capacity
+        .arg(ts.frequency * 1000.0) // refill rate in ms
+        .arg(ts.amount) // refill amount
+        .invoke_async(&mut connection)
+        .await?;
+
+    let now = now_millis()?;
+    let sleep_duration = {
+        // This might happen at very low refill frequencies.
+        // Current handling isn't robust enough to ensure
+        // exactly uniform traffic when this happens. Might be
+        // something worth looking at more in the future, if needed.
+        if slot <= now {
+            Duration::from_millis(0)
+        } else {
+            Duration::from_millis(slot - now)
+        }
+    };
+
+    if ts.max_sleep > 0.0 && sleep_duration > Duration::from_secs_f32(ts.max_sleep) {
+        return Err(SLError::MaxSleepExceeded(format!(
+            "Received wake up time in {} seconds, which is \
+            greater or equal to the specified max sleep of {} seconds",
+            sleep_duration.as_secs(),
+            ts.max_sleep
+        )));
+    }
+
+    tokio::time::sleep(sleep_duration).await;
+
+    Ok(())
 }
 
 #[pymethods]
@@ -102,41 +130,8 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'a>(slf: PyRef<'_, Self>, py: Python<'a>) -> PyResult<&'a PyAny> {
-        // Send class state to another thread, by using a channel
         let receiver = send_shared_state(ThreadState::from(&slf))?;
-
-        future_into_py(py, async {
-            // Receive class state
-            let ts = receive_shared_state(receiver)?;
-
-            // Connect to redis
-            let mut connection = open_client_connection(&ts.client).await?;
-
-            // Retrieve slot
-            let slot: u64 = get_script("src/scripts/schedule.lua")?
-                .key(&ts.name)
-                .arg(ts.capacity) // capacity
-                .arg(ts.frequency * 1000.0) // refill rate in ms
-                .arg(ts.amount) // refill amount
-                .invoke_async(&mut connection)
-                .await
-                .map_err(|e| RedisError::new_err(e.to_string()))?;
-
-            let now = now_millis()?;
-            let sleep_duration = {
-                // This might happen at very low refill frequencies.
-                // Current handling isn't robust enough to ensure
-                // exactly uniform traffic when this happens. Might be
-                // something worth looking at more in the future, if needed.
-                if slot <= now {
-                    Duration::from_millis(0)
-                } else {
-                    Duration::from_millis(slot - now)
-                }
-            };
-            sleep_for(sleep_duration, Duration::from_secs_f32(ts.max_sleep)).await?;
-            Ok(())
-        })
+        future_into_py(py, async { Ok(schedule_and_sleep(receiver).await?) })
     }
 
     /// Do nothing on aexit.

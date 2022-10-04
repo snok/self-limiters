@@ -1,5 +1,4 @@
 use crate::_errors::SLError;
-use redis::aio::Connection;
 use redis::{parse_redis_url, Client, Script};
 use std::fs::File;
 use std::io::Read;
@@ -18,16 +17,6 @@ pub fn send_shared_state<T>(ts: T) -> SLResult<Receiver<T>> {
     let (sender, receiver) = channel();
     sender.send(ts)?;
     Ok(receiver)
-}
-
-/// Read data from channel
-pub fn receive_shared_state<T>(receiver: Receiver<T>) -> SLResult<T> {
-    Ok(receiver.recv()?)
-}
-
-/// Open Redis connection
-pub async fn open_client_connection(client: &Client) -> SLResult<Connection> {
-    Ok(client.get_async_connection().await?)
 }
 
 pub fn get_script(path: &str) -> SLResult<Script> {
