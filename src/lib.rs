@@ -10,6 +10,7 @@ mod semaphore;
 
 mod _errors;
 mod _utils;
+mod tests;
 mod token_bucket;
 
 #[pymodule]
