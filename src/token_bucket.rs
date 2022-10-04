@@ -42,6 +42,7 @@ impl ThreadState {
 /// in situations where you need to limit traffic to `n` requests per `m` unit of time.
 /// For example, when you can only send 1 request per minute.
 #[pyclass]
+// #[pyclass(frozen)]  # <-- TODO: Add in when on pyo3 v0.17
 #[pyo3(name = "TokenBucket")]
 #[pyo3(module = "self_limiters")]
 pub struct TokenBucket {
