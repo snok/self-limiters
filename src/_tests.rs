@@ -3,7 +3,7 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use redis::{AsyncCommands, Client};
+    use redis::Client;
 
     use crate::_utils::*;
     use crate::semaphore::ThreadState as SemaphoreThreadState;

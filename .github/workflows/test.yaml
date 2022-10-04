@@ -126,7 +126,7 @@ jobs:
           cargo test
           maturin develop
           coverage run -m pytest tests && coverage xml
-          cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex _errors
+          cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex _errors,_tests
       - uses: codecov/codecov-action@v3
         with:
           files: coverage.lcov,coverage.xml

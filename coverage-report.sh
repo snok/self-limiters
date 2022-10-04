@@ -1,5 +1,9 @@
 #!/bin/zsh
 
+# Before running this, you'll need to run
+# $ rustup component add llvm-tools-preview
+# $ cargo install cargo-llvm-cov
+
 set -euo pipefail
 
 source <(cargo llvm-cov show-env --export-prefix)
@@ -13,4 +17,4 @@ source "$VIRTUAL_ENV"/bin/activate \
   && maturin develop \
   && coverage run -m pytest tests
 
-cargo llvm-cov report --ignore-filename-regex _errors
+cargo llvm-cov report --ignore-filename-regex _errors,_tests
