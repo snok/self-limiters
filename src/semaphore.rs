@@ -14,11 +14,11 @@ use crate::_utils::{
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
-pub(crate) struct ThreadState {
-    pub(crate) client: Client,
-    pub(crate) name: String,
-    pub(crate) capacity: u32,
-    pub(crate) max_sleep: f32,
+pub struct ThreadState {
+    pub client: Client,
+    pub name: String,
+    pub capacity: u32,
+    pub max_sleep: f32,
 }
 
 impl ThreadState {
@@ -49,7 +49,7 @@ pub struct Semaphore {
     client: Client,
 }
 
-async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
+pub async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
     // Retrieve thread state struct
     let ts = receiver.recv()?;
 

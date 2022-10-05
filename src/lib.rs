@@ -1,17 +1,15 @@
-extern crate core;
-
 use pyo3::prelude::*;
 
 use token_bucket::TokenBucket;
 
-use crate::_errors::{MaxSleepExceededError, RedisError};
-use crate::semaphore::Semaphore;
-mod semaphore;
+use _errors::{MaxSleepExceededError, RedisError};
+use semaphore::Semaphore;
 
-mod _errors;
-mod _tests;
-mod _utils;
-mod token_bucket;
+pub mod _errors;
+pub mod _tests;
+pub mod _utils;
+pub mod semaphore;
+pub mod token_bucket;
 
 #[pymodule]
 fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {
