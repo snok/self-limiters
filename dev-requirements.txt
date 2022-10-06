@@ -8,3 +8,4 @@ uvloop
 coverage
 redis
 types-redis
+typer
