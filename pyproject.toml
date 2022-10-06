@@ -1,6 +1,6 @@
 [project]
 name = "self-limiters"
-description = "Distributed async rate limiters using Redis, for client self-limiting"
+description = "Distributed async rate limiters, using Redis"
 authors = [{ name = "Sondre Lillebø Gundersen", email = "sondrelg@live.no" }]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -10,7 +10,7 @@ repository = "https://github.com/sondrelg/self-limiters"
 keywords = ["distributed", "async", "rate-limit", "rate", "limit", "limiting", "redis", "rust"]
 dependencies = []
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Programming Language :: Rust",
     'Programming Language :: Python',
     'Programming Language :: Python :: 3.8',
