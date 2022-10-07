@@ -1,0 +1,19 @@
+[package]
+name = "self-limiters"
+version = "0.0.0"  # This is set on release in the release workflow
+edition = "2021"
+include = ["src/", "scripts/"]
+
+[lib]
+name = "self_limiters"
+crate-type = ["cdylib"]
+
+[dependencies]
+self-limiters-core = { path = "../self_limiters_core" }
+pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
+pyo3-log = "^0.6.0"
+pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
+redis = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

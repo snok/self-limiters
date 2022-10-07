@@ -1,15 +1,15 @@
 use pyo3::prelude::*;
 
+use errors::{MaxSleepExceededError, RedisError};
+use semaphore::Semaphore;
 use token_bucket::TokenBucket;
 
-use _errors::{MaxSleepExceededError, RedisError};
-use semaphore::Semaphore;
-
-pub mod _errors;
-pub mod _tests;
-pub mod _utils;
+pub mod errors;
 pub mod semaphore;
+#[cfg(test)]
+mod tests;
 pub mod token_bucket;
+mod utils;
 
 #[pymodule]
 fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {

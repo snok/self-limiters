@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 from redis.asyncio.client import Redis
+
 from self_limiters import RedisError
 
 from .conftest import run, semaphore_factory, tokenbucket_factory

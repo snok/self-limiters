@@ -1,0 +1,26 @@
+[package]
+name = "self-limiters-core"
+version = "0.0.1"
+edition = "2021"
+include = [
+    "src/",
+    "scripts/",
+]
+
+[lib]
+name = "self_limiters_core"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+log = "0.4.17"
+tokio = { workspace = true }
+redis = { workspace = true, features = ["tokio-comp"] }
+
+[dev-dependencies]
+criterion = { version = "0.3.1", features = ["async_tokio", "html_reports"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+mockall = "0.9.1"
+
+[[bench]]
+name = "bench_semaphore"
+harness = false

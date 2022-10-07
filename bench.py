@@ -6,6 +6,7 @@ from statistics import median
 from uuid import uuid4
 
 import typer
+
 from self_limiters import Semaphore, TokenBucket
 
 # {type}_{iterations}_{count}

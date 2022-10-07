@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 
 import pytest
+
 from self_limiters import MaxSleepExceededError
 
 from .conftest import run, tokenbucket_factory

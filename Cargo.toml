@@ -1,21 +1,10 @@
-[package]
-name = "self-limiters"
-version = "0.0.0"  # This is set on release in the release workflow
-edition = "2021"
-include = ["/src"]
+[workspace]
+members = [
+    "self_limiters",
+    "self_limiters_core",
+]
 
-[lib]
-name = "self_limiters"
-crate-type = ["cdylib"]
-
-[dependencies]
-pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
-pyo3-log = "^0.6.0"
-log = "0.4.17"
-pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
-tokio = "^1.20.1"
-redis = { version="^0.21.5", features = ["tokio-comp"] }
-
-[dev-dependencies]
-cargo-llvm-cov = { version = "*" }
-clippy = { version = "*" }
+[workspace.dependencies]
+# TODO: Check if we can prune features here
+tokio = { version = "^1.20.1", features=["time", "macros"]}
+redis = { version = "^0.21.5" }
