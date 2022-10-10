@@ -71,9 +71,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
 
     // Wait for our turn - this waits non-blockingly until we're free to proceed
     let start = now_millis()?;
-    connection
-        .blpop::<&str, Option<()>>(&ts.name, ts.max_sleep as usize)
-        .await?;
+    connection.blpop(&ts.name, ts.max_sleep as usize).await?;
 
     // Raise an exception if we waited too long
     if ts.max_sleep > 0.0 && (now_millis()? - start) > (ts.max_sleep * 1000.0) as u64 {
