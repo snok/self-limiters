@@ -117,6 +117,11 @@ jobs:
           pip install -U pip setuptools wheel
           pip install -r dev-requirements.txt
         if: steps.cache-venv-and-cargo.outputs.cache-hit != 'true'
+      - name: Build and install
+        run: |
+          source .venv/bin/activate
+          maturin build --release --locked --out ./ --strip  --find-interpreter --no-default-features
+          pip install ./self_limiters-* --force-reinstall
       - name: Run tests
         run: |
           source .venv/bin/activate
@@ -125,9 +130,14 @@ jobs:
           export CARGO_INCREMENTAL=1
           cargo llvm-cov clean --workspace
           cargo test
-          maturin develop
           coverage run -m pytest tests && coverage xml
           cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex _errors,_tests
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.35
+          python bench.py s --count 100 --iterations 30 --target 3.5
+        if: matrix.python-version == '3.10.7'
       - uses: codecov/codecov-action@v3
         with:
           files: coverage.lcov,coverage.xml

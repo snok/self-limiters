@@ -1,7 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
 from functools import partial
-from pprint import pprint
 from statistics import median
 from uuid import uuid4
 
@@ -32,11 +31,32 @@ def main(
     type: str,
     count: int = 10,
     iterations: int = 10,
+    target: float | None = None,
     capacity: int = 1,
     max_sleep: float = 0.0,
     redis_url: str = 'redis://127.0.0.1:6389',
     sleep: float = 0.0,
 ):
+    """
+    Runs a simple benchmark using the library limiters.
+
+    Can be run like:
+
+        python bench.py s \
+            --count 100 \
+            --iterations 12 \
+            --target 4
+
+    :param type: Which of the limiters to use. Semaphore or TokenBucket.
+    :param count: How many context managers to run for a single limiter.
+    :param iterations: How many limiters to run.
+    :param target: What maximum time to allow, in ms.
+    :param capacity: The limiter capacity.
+    :param max_sleep: The limiter max sleep.
+    :param redis_url: Redis connection string.
+    :param sleep: How long to sleep before exiting context manager closure.
+    :return: Nothing.
+    """
     t: partial[TokenBucket | Semaphore]
     if type.startswith('s'):
         typer.echo('Testing semaphore...')
@@ -66,11 +86,14 @@ def main(
     print(f'Discarding {n} first samples')
     seconds = seconds[n:]
 
-    avg = sum(seconds) / iterations
-    med = median(seconds)
-    print(f'Average was {avg / count * 1000:.1f}ms per run')
-    print(f'Median was {med / count * 1000:.1f}ms per run')
-    pprint(seconds)
+    avg = sum(seconds) / iterations / count * 1000
+    med = median(seconds) / count * 1000
+    print(f'Average was {avg :.1f}ms per run')
+    print(f'Median was {med:.1f}ms per run')
+
+    if target:
+        assert med <= target, f'Median time of {med}ms was not above target of {target}ms'
+        print(f'Median time was below target of {target}ms')
 
 
 if __name__ == '__main__':
