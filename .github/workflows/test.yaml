@@ -110,7 +110,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ hashFiles('**/poetry.lock') }}-${{ steps.python-setup.outputs.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
+          key: ${{ hashFiles('**/dev-requirements.txt') }}-${{ steps.python-setup.outputs.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
       - run: |
           python -m venv .venv
           source .venv/bin/activate
