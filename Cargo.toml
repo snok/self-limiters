@@ -9,12 +9,12 @@ name = "self_limiters"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.16.5", features = ["extension-module", "abi3-py38"] }
-pyo3-log = "^0.6.0"
-log = "0.4.17"
-pyo3-asyncio = { version = "^0.16", features = ["attributes", "tokio-runtime"] }
-tokio = "^1.20.1"
-redis = { version="^0.21.5", features = ["tokio-comp"] }
+pyo3 = { version = " >=0.17.2", features = ["extension-module", "abi3-py38"] }
+pyo3-log = ">=0.7.0"
+log = ">=0.4.17"
+pyo3-asyncio = { version = ">=0.17.0", features = ["attributes", "tokio-runtime"] }
+tokio = ">=1.20.1"
+redis = { version=">=0.21.5", features = ["tokio-comp"] }
 
 [dev-dependencies]
 cargo-llvm-cov = { version = "*" }
