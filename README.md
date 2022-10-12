@@ -14,8 +14,8 @@
 <br>
 <br>
 
-This library implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
-as well as the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
+Implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
+and a [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
 Both implementations are FIFO, and require redis.
 
 Between them, the two implementations make it possible to regulate traffic with respect to:

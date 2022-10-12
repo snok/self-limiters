@@ -84,12 +84,94 @@ jobs:
           cargo test
           coverage run -m pytest tests && coverage xml
           cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex _errors,_tests
+
+      - run: cat Cargo.toml | grep "pyo3"
+      - run: cat Cargo.lock | grep "pyo3"
       - name: Run benchmarks
         run: |
           source .venv/bin/activate
-          python bench.py tb --count 100 --iterations 30 --target 0.35
-          python bench.py s --count 100 --iterations 30 --target 3.5
-        if: matrix.python-version == '3.10'
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
+      - name: Run benchmarks
+        run: |
+          source .venv/bin/activate
+          python bench.py tb --count 100 --iterations 30 --target 0.5
+          python bench.py s --count 100 --iterations 30 --target 5
       - uses: codecov/codecov-action@v3
         with:
           files: coverage.lcov,coverage.xml
