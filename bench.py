@@ -1,20 +1,23 @@
+from __future__ import annotations
+
 import asyncio
 from datetime import datetime, timedelta
 from functools import partial
 from statistics import median
+from typing import Optional, Union
 from uuid import uuid4
 
 import typer
 from self_limiters import Semaphore, TokenBucket
 
 
-async def run(t: Semaphore | TokenBucket, sleep: float):
+async def run(t: Union[Semaphore, TokenBucket], sleep: float):
     """Run context manager."""
     async with t:
         await asyncio.sleep(sleep)
 
 
-async def run_n(*, n: int, t: Semaphore | TokenBucket, sleep: float):
+async def run_n(*, n: int, t: Union[Semaphore, TokenBucket], sleep: float):
     """Call run `n` times for the same limiter."""
     tasks = [asyncio.create_task(run(t, sleep)) for _ in range(n)]
     start = datetime.now()
@@ -22,7 +25,7 @@ async def run_n(*, n: int, t: Semaphore | TokenBucket, sleep: float):
     return datetime.now() - start
 
 
-async def run_iterations(t: partial[Semaphore | TokenBucket], sleep: float, count: int, iterations: int):
+async def run_iterations(t: partial, sleep: float, count: int, iterations: int):
     """Call run_n for `iterations` permutations of a limiter."""
     return [await run_n(n=count, t=t(name=uuid4().hex[:6]), sleep=sleep) for _ in range(iterations)]
 
@@ -31,7 +34,7 @@ def main(
     type: str,
     count: int = 10,
     iterations: int = 10,
-    target: float | None = None,
+    target: Optional[float] = None,
     capacity: int = 1,
     max_sleep: float = 0.0,
     redis_url: str = 'redis://127.0.0.1:6389',
@@ -57,7 +60,7 @@ def main(
     :param sleep: How long to sleep before exiting context manager closure.
     :return: Nothing.
     """
-    t: partial[TokenBucket | Semaphore]
+    t: partial
     if type.startswith('s'):
         typer.echo('Testing semaphore...')
         t = partial(Semaphore, capacity=capacity, max_sleep=max_sleep, redis_url=redis_url)
