@@ -91,8 +91,8 @@ def main(
 
     avg = sum(seconds) / iterations / count * 1000
     med = median(seconds) / count * 1000
-    print(f'Average was {avg :.1f}ms per run')
-    print(f'Median was {med:.1f}ms per run')
+    print(f'Average was {avg :.2f}ms per run')
+    print(f'Median was {med:.2f}ms per run')
 
     if target:
         assert med <= target, f'Median time of {med}ms was not above target of {target}ms'
