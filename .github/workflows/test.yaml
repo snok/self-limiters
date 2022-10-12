@@ -76,7 +76,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.8.14", "3.9.14", "3.10.7", "3.11.0-rc.2"]
+        python-version: [ "3.8", "3.9", "3.10", "3.11.0-rc.2" ]
     services:
       redis:
         image: redis:6.2.5-alpine
@@ -97,6 +97,7 @@ jobs:
           components: llvm-tools-preview
       - uses: taiki-e/install-action@cargo-llvm-cov
       - uses: actions/setup-python@v4
+        id: python-setup
         with:
           python-version: "${{ matrix.python-version }}"
       - uses: actions/cache@v3
@@ -109,7 +110,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ hashFiles('**/poetry.lock') }}-${{ matrix.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
+          key: ${{ hashFiles('**/poetry.lock') }}-${{ steps.python-setup.outputs.python-version }}-${{ hashFiles('**/Cargo.lock') }}-0
       - run: |
           python -m venv .venv
           source .venv/bin/activate
