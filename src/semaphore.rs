@@ -35,8 +35,7 @@ impl ThreadState {
 /// Async context manager useful for controlling client traffic
 /// in situations where you need to limit traffic to `n` requests concurrently.
 /// For example, when you can only have 2 active requests simultaneously.
-#[pyclass]
-// #[pyclass(frozen)]  # <-- TODO: Add in when on pyo3 v0.17
+#[pyclass(frozen)]
 #[pyo3(name = "Semaphore")]
 #[pyo3(module = "self_limiters")]
 pub struct Semaphore {
