@@ -1,12 +1,12 @@
 <br>
 <br>
 <p align="center">
-<a href="https://github.com/sondrelg/self-limiters"><img src="docs/logo.svg" width="250px"></a>
+<a href="https://github.com/sondrelg/self-limiters"><img src="docs/logo.svg" width="280px"></a>
 <br>
-<b>distributed async rate limiters for clients</b>
+<b>distributed async client rate limiters</b>
 <br><br>
 </p>
-<hr>
+<br>
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters.svg"></a>
 <a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
 <a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
@@ -14,32 +14,32 @@
 <br>
 <br>
 
-This library implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
-as well as the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
+This package implements an async distributed [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)),
+and the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket).
 Both implementations are FIFO, and require redis.
 
 Between them, the two implementations make it possible to regulate traffic with respect to:
 
-- **Concurrency based limits** (max 5 active requests at the time, across all servers), or
-- **Time based limits** (max 5 requests every 10 seconds, across all servers)
+- **Concurrency-based limits** (5 active requests at the same time), or
 
-The motivation for implementing these was to help with rate-limiting,
-but the semaphore and token bucket implementations can be used for anything.
+- **Time-based limits** (5 requests every 10 seconds)
+
+This was written for rate-limiting, but the semaphore and token bucket
+implementations can be used for anything.
 
 # Installation
 
-```bash
+```shell
 pip install self-limiters
 ```
 
 # Usage
 
-Both implementations are written as async context managers,
-and are used the same way.
+Both implementations are written as async context managers.
 
 ## Semaphore
 
-A semaphore can be initialized and used like this:
+The `Semaphore` context manager is used as follows:
 
 ```python
 from self_limiters import Semaphore
@@ -58,12 +58,11 @@ async def main():
         client.get(...)
 ```
 
-A `MaxSleepExceededError` is raised after `max_sleep` seconds, if a value was specified. By default,
-the value is zero, which means wait forever.
+A `MaxSleepExceededError` is raised after `max_sleep` seconds, if a max-sleep is specified.
 
 ## Token bucket
 
-A token bucket is used like this:
+The `TokenBucket` context manager is used like this:
 
 ```python
 from self_limiters import TokenBucket
@@ -83,9 +82,7 @@ async def main():
         client.get(...)
 ```
 
-The token bucket implementation immediately estimates when a new entry to the queue will
-have its turn. A `MaxSleepExceededError` is raised if the time estimated exceeds the specified max sleep.
-If `max_sleep` is unspecified, we'll let the queue grow forever.
+If max-sleep is set and the sleep time exceeds max-sleep a `MaxSleepExceededError` is raised.
 
 ## Decorators
 
@@ -93,8 +90,6 @@ The package doesn't ship any decorators, but if you want to apply these to a fun
 you can roll your own, like this:
 
 ```python
-from functools import wraps
-
 from self_limiters import Semaphore
 
 
@@ -107,7 +102,6 @@ def limit(name, capacity):
             # Use context manager within the decorator
             async with limiter:
                 return await f(*args, **kwargs)
-
         return inner
     return middle
 
@@ -118,33 +112,67 @@ def retrieve_user(id: UUID) -> User:
     ...
 ```
 
-# Performance considerations
+# Implementation breakdown
 
-Some parts of the package logic are implemented using Lua scripts, to run
-_on_ the redis instance. This makes it possible to do the same work in one
-request (from the client), that would otherwise need `n` requests. Lua scripts
-seem to present the most efficient way to run the calls each implementation
-requires us to, and client calls to Lua scripts are non-blocking.
+The package was written for performance, and it seems that the most performant
+way to implement these algorithms is by leveraging [Lua](http://www.lua.org/about.html)
+scripts. I initially wrote this in pure [Rust](https://www.rust-lang.org/), but Lua scripts
+present a couple of really great benefits:
 
-For example, the flow of the semaphore implementation is:
-- Run our [initial Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create the semaphore in Redis, if needed
-- Run [`BLPOP`](https://redis.io/commands/blpop/) to wait until we acquire the semaphore
-- Run [the cleanup script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back capacity
+- [Lua](http://www.lua.org/about.html) scripts are executed on a redis instance,
+  and lets us implement close to the entire implementation logic in a single script.
+  This means our client can make 1 request to redis to run the script instead of
+  1 request per redis call needed. The time saved by reducing the number of requests
+  is huge.
 
-Each step is one call by the client, and all of these are non-blocking.
+- The initial rust implementation (pre-lua scripts) had to use the
+  [redlock](https://redis.com/redis-best-practices/communication-patterns/redlock/)
+  algorithm to ensure fairness. With Lua scripts (since redis instance are
+  single threaded), our implementations are FIFO out of the box.
 
-For the second implementation, the token bucket, the breakdown is even simpler.
-- Run the [initial Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) to retrieve a wake-up time
-- Sleep asynchronously until the wake-up time
+  This makes our implementation a lot faster, since we no longer need locks, and it
+  simultaneously makes the code much, much simpler.
 
-Both of these are also non-blocking.
+With Lua scripts, this is how our flows ended up being:
 
-In other words, the limiters' impact on the application event-loop should be negligible.
+### The semaphore implementation
+
+1. Run [create_semaphore.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create a list, which will be the foundation of our semaphore. This is skipped if it has already been created.
+2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity. When it does, we pop from the list.
+3. Then run another [release_semaphore.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back the capacity we popped.
+
+So in total we make 3 calls to redis (we would have made 6 without the scripts),
+which are all non-blocking.
+
+### The token bucket implementation
+
+Here, things are *even* simpler. The steps are:
+
+1. Run [schedule.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) to retrieve a wake-up time.
+2. Sleep until then.
+
+We make 1 call instead of 3, and both of these are also non-blocking.
+
+In other words, the limiters' impact on an application event-loop should be completely negligible.
+
+# Benchmarks
+
+When testing on Github actions we get sub-millisecond runtimes:
+
+- processing 100 nodes with the semaphore implementation takes ~0.6ms per instance
+- processing 100 nodes with the token bucket implementation takes ~0.03ms per instance
+
+<img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
+
+The majority of this should also still be waiting for i/o.
+
 
 # Implementation details
 
-This section assumes you know how a Python (async) context manager works.
-If this is new to you, take a look [here](https://www.geeksforgeeks.org/context-manager-in-python/) first!
+This section breaks down how both implementations are written, in detail.
+It assumes you know how a Python (async) context manager works. If this
+is new to you, take a look [here](https://www.geeksforgeeks.org/context-manager-in-python/)
+first!
 
 ## The semaphore implementation
 
@@ -241,16 +269,6 @@ Then we just sleep. Simple!
 </li>
 </ul>
 
-# Benchmarks
-
-When testing locally:
-
-- processing 100 nodes with the semaphore implementation takes ~2.8ms per node
-- processing 100 nodes with the token bucket implementation takes ~0.2ms per node
-
-<img src="https://slack-imgs.com/?c=1&o1=ro&url=https%3A%2F%2Fmedia4.giphy.com%2Fmedia%2FzCv1NuGumldXa%2Fgiphy.gif%3Fcid%3D6104955e8s1fovp9mroo6e9uj176fvl3o5earbfq5lkzjt03%26rid%3Dgiphy.gif%26ct%3Dg"/>
-
-Benchmarks were run on a 2019 intel macbook pro
 
 # Contributing
 
