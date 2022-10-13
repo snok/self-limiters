@@ -17,5 +17,5 @@ tokio = ">=1.20.1"
 redis = { version=">=0.21.5", features = ["tokio-comp"] }
 
 [dev-dependencies]
-cargo-llvm-cov = { version = "*" }
-clippy = { version = "*" }
+cargo-llvm-cov = { version = ">=0.4.1" }
+clippy = { version = ">=0.0.302" }
