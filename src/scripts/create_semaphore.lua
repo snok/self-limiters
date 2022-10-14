@@ -27,18 +27,18 @@ local capacity = tonumber(ARGV[1])
 -- One thing to note about this call is that we would rather not do this. It would
 -- be much more intuitive to call EXISTS on the list key and create the list if it
 -- did not exist. Unfortunately, if you create a list with 3 elements, and you pop
--- all three elements (popping == acquiring the semaphore), the list stops "existing"
+-- all three elements (popping == acquiring the semaphore), the list stops 'existing'
 -- once empty. In other words, EXISTS is not viable, so this is a workaround.
 -- If you have better suggestions for how to achieve this, please submit a PR.
-local does_not_exist = redis.call("SETNX", string.format("(%s)-exists", key), 1)
+local does_not_exist = redis.call('SETNX', string.format('(%s)-exists', key), 1)
 
 -- Create the list if none exists
 if does_not_exist == 1 then
-    -- Add "1" as an argument equal to the capacity of the semaphore
+    -- Add '1' as an argument equal to the capacity of the semaphore
     -- In other words, if we passed capacity 5 here, this should
     -- generate `{RPUSH, 1, 1, 1, 1, 1}`.
     -- The values we push to the list are arbitrary.
-    local args = {"RPUSH", key}
+    local args = {'RPUSH', key}
     for _=1,capacity do
         table.insert(args, 1)
     end

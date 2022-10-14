@@ -18,12 +18,12 @@ redis.replicate_commands()
 local key = tostring(KEYS[1])
 
 -- Add back capacity to the queue
-redis.call("LPUSH", key, 1)
+redis.call('LPUSH', key, 1)
 
 -- Then set expiry for the queue
-redis.call("EXPIRE", key, 30)
+redis.call('EXPIRE', key, 30)
 
 -- Then set expiry for the key we use to check if the queue exists
 -- See comments in the other semaphore script for a detailed explanation
 -- of this value.
-redis.call("EXPIRE", string.format("(%s)-exists", key), 30)
+redis.call('EXPIRE', string.format('(%s)-exists', key), 30)

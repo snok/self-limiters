@@ -40,7 +40,7 @@ local refill_rate = tonumber(ARGV[2])
 local refill_amount = tonumber(ARGV[3])
 
 -- Get current time (ms timestamp)
-local redis_time = redis.call("TIME") -- Array of [seconds, microseconds]
+local redis_time = redis.call('TIME') -- Array of [seconds, microseconds]
 local now = tonumber(redis_time[1]) * 1000 + (tonumber(redis_time[2]) / 1000)  -- Millisecond timestamp
 
 -- Instantiate default bucket values
@@ -50,10 +50,10 @@ local tokens = refill_amount
 local slot = now + refill_rate
 
 -- Retrieve (possibly) stored state
-local data = redis.call("GET", data_key)
+local data = redis.call('GET', data_key)
 
 if data ~= false then
-    for a, b in string.gmatch(data, "(%S+) (%S+)") do
+    for a, b in string.gmatch(data, '(%S+) (%S+)') do
         slot = tonumber(a)
         tokens = tonumber(b)
     end
@@ -85,6 +85,6 @@ end
 tokens = tokens - 1
 
 -- Save state and set expiry
-redis.call("SETEX", data_key, 30, string.format("%d %d", slot, tokens))
+redis.call('SETEX', data_key, 30, string.format('%d %d', slot, tokens))
 
 return slot
