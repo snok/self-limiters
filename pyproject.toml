@@ -27,7 +27,6 @@ classifiers = [
 bindings = "pyo3"
 profile = "release"
 strip = true
-frozen = true
 
 [project.urls]
 releases = "https://github.com/sondrelg/self-limiters/releases"
