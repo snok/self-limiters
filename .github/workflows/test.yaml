@@ -83,7 +83,7 @@ jobs:
           cargo llvm-cov clean --workspace
           cargo test
           coverage run -m pytest tests && coverage xml
-          cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex _errors,_tests
+          cargo llvm-cov report --lcov --output-path coverage.lcov --ignore-filename-regex "_errors|_tests|lib"
       - name: Run benchmarks
         run: |
           source .venv/bin/activate
