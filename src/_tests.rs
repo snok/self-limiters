@@ -61,14 +61,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_get_script() -> SLResult<()> {
-        get_script("src/scripts/schedule.lua")?;
-        get_script("src/scripts/create_semaphore.lua")?;
-        get_script("src/scripts/release_semaphore.lua")?;
-        Ok(())
-    }
-
     #[tokio::test]
     async fn test_now_millis() -> SLResult<()> {
         let now = now_millis()?;

@@ -1,8 +1,5 @@
 use crate::_errors::SLError;
-use redis::{parse_redis_url, Client, Script};
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use redis::{parse_redis_url, Client};
 use std::sync::mpsc::{channel, Receiver};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -17,14 +14,6 @@ pub fn send_shared_state<T>(ts: T) -> SLResult<Receiver<T>> {
     let (sender, receiver) = channel();
     sender.send(ts)?;
     Ok(receiver)
-}
-
-pub fn get_script(path: &str) -> SLResult<Script> {
-    let path = Path::new(path);
-    let mut file = File::open(path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    Ok(Script::new(&content))
 }
 
 pub fn now_millis() -> SLResult<u64> {

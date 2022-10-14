@@ -5,11 +5,11 @@ use log::{debug, info};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
-use redis::{AsyncCommands, Client};
+use redis::{AsyncCommands, Client, Script};
 use std::sync::mpsc::Receiver;
 
 use crate::_utils::{
-    get_script, now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
+    now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
 };
 
 /// Pure rust DTO for the data we need to pass to our thread
@@ -56,11 +56,61 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     let mut connection = ts.client.get_async_connection().await?;
 
     // Define queue if it doesn't already exist
-    if get_script("src/scripts/create_semaphore.lua")?
-        .key(&ts.name)
-        .arg(ts.capacity)
-        .invoke_async(&mut connection)
-        .await?
+    if Script::new(
+        r"
+        --- Script called from the Semaphore implementation.
+        ---
+        --- Lua scripts are run atomically by default, and since redis
+        --- is single threaded, there are no race conditions to worry about.
+        ---
+        --- The script checks if a list exists for the Semaphore, and
+        --- creates one of length `capacity` if it doesn't.
+        ---
+        --- keys:
+        --- * key: The key to use for the list
+        ---
+        --- args:
+        --- * capacity: The capacity of the semaphore (i.e., the length of the list)
+        ---
+        --- returns:
+        --- * 1 if created, else 0 (but the return value isn't used; only useful for debugging)
+
+        redis.replicate_commands()
+
+        -- Init config variables
+        local key = tostring(KEYS[1])
+        local capacity = tonumber(ARGV[1])
+
+        -- Check if list exists
+        -- SETNX does in one call what we would otherwise do in two
+        --
+        -- One thing to note about this call is that we would rather not do this. It would
+        -- be much more intuitive to call EXISTS on the list key and create the list if it
+        -- did not exist. Unfortunately, if you create a list with 3 elements, and you pop
+        -- all three elements (popping == acquiring the semaphore), the list stops 'existing'
+        -- once empty. In other words, EXISTS is not viable, so this is a workaround.
+        -- If you have better suggestions for how to achieve this, please submit a PR.
+        local does_not_exist = redis.call('SETNX', string.format('(%s)-exists', key), 1)
+
+        -- Create the list if none exists
+        if does_not_exist == 1 then
+            -- Add '1' as an argument equal to the capacity of the semaphore
+            -- In other words, if we passed capacity 5 here, this should
+            -- generate `{RPUSH, 1, 1, 1, 1, 1}`.
+            -- The values we push to the list are arbitrary.
+            local args = {'RPUSH', key}
+            for _=1,capacity do
+                table.insert(args, 1)
+            end
+            redis.call(unpack(args))
+            return true
+        end
+        return false",
+    )
+    .key(&ts.name)
+    .arg(ts.capacity)
+    .invoke_async(&mut connection)
+    .await?
     {
         info!(
             "Created new semaphore queue with a capacity of {}",
@@ -90,10 +140,41 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
     let mut connection = ts.client.get_async_connection().await?;
 
     // Define queue if it doesn't exist
-    get_script("src/scripts/release_semaphore.lua")?
-        .key(&ts.name)
-        .invoke_async(&mut connection)
-        .await?;
+    Script::new(
+        r"
+        --- Script called from the Semaphore implementation.
+        ---
+        --- Lua scripts are run atomically by default, and since redis
+        --- is single threaded, there are no race conditions to worry about.
+        ---
+        --- The script releases the semaphore (pushes back the popped entry
+        --- to our list) and sets and expiry on all related keys.
+        ---
+        --- keys:
+        --- * key: The key to use for the list
+        ---
+        --- returns:
+        --- * Nothing
+
+        redis.replicate_commands()
+
+        -- Init config variables
+        local key = tostring(KEYS[1])
+
+        -- Add back capacity to the queue
+        redis.call('LPUSH', key, 1)
+
+        -- Then set expiry for the queue
+        redis.call('EXPIRE', key, 30)
+
+        -- Then set expiry for the key we use to check if the queue exists
+        -- See comments in the other semaphore script for a detailed explanation
+        -- of this value.
+        redis.call('EXPIRE', string.format('(%s)-exists', key), 30)",
+    )
+    .key(&ts.name)
+    .invoke_async(&mut connection)
+    .await?;
 
     debug!("Released semaphore");
     Ok(())
