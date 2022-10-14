@@ -181,37 +181,34 @@ to `n` concurrent actions. For example if you have 10 web servers, and
 you're interacting with an API that will only tolerate 5 concurrent
 requests before locking you out.
 
-In terms of fairness, the semaphore implementation skews towards FIFO,
-but is opportunistic. A worker will not be allowed to run until there
-is capacity assigned to them, specifically; but the order of execution
-is not guaranteed to be exactly FIFO.
-
 The flow can be broken down as follows:
 <p align="center">
-<img width=700 heigh=700 src="docs/semaphore.png"></img>
+  <img width=700 heigh=600 src="docs/semaphore.png"></img>
 </p>
 <ul>
 <li>
 
-An [initial Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua)
-will call [`SETNX`](https://redis.io/commands/setnx/) on the name of the queue plus a postfix (if the `name`
-specified in the class instantiation is "my-queue", then the queue name will be `__self-limiters:my-queue`).
-If the returned value is 1 it means the queue we will use for our semaphore does not exist yet and needs to be created.
+The [create_semaphore Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua)
+calls [`SETNX`](https://redis.io/commands/setnx/) on the key of the queue plus a postfix (if the `name`
+specified in the class instantiation is "my-queue", then the queue name will be `__self-limiters:my-queue`
+and setnx will be called for `__self-limiters:my-queue-exists`). If the returned value is 1 it means the
+queue we will use for our semaphore does not exist yet and needs to be created.
 
-(It might strike you as weird to maintain a separate string, just to indicate the existence of a list,
-when we could just check the list itself. It would actually be great if we could use
-[`EXISTS`](https://redis.io/commands/exists/) on the list directly, but a list is deleted when all elements are
-popped (i.e., when a semaphore is fully acquired), so I don't see another way of doing this.
-Contributions are welcome if you do.)
+(It might strike you as weird to maintain a separate value, just to indicate whether a list exists,
+when we could just check the list itself. It would be nice if we could use
+[`EXISTS`](https://redis.io/commands/exists/) on the list directly, but unfortunately a list is considered
+not to exist when all elements are popped (i.e., when a semaphore is fully acquired), so I don't see
+another way of doing this. Contributions are very welcome if you do!
 </li>
 <li>
 
-If the queue needs to be created we call [`RPUSH`](https://redis.io/commands/rpush/) with the number of arguments
-equal to the `capacity` value used when initializing the semaphore instance.
+Then if the queue needs to be created we call [`RPUSH`](https://redis.io/commands/rpush/) with the number of arguments
+equal to the `capacity` value used when initializing the semaphore instance. For a semaphore with
+a capacity of 5, we call `RPUSH 1 1 1 1 1`, where the values are completely arbitrary.
 </li>
 <li>
 
-Once the queue has been created, we call [`BLPOP`](https://redis.io/commands/blpop/) to block until it's
+Once the list/queue has been created, we call [`BLPOP`](https://redis.io/commands/blpop/) to block until it's
 our turn. `BLPOP` is FIFO by default. We also make sure to specify the `max_sleep` based on the initialized
 semaphore instance setting. If nothing was passed we allow sleeping forever.
 </li>
@@ -245,10 +242,10 @@ The flow can be broken down as follows:
 <ul>
 <li>
 
-A [Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua)
-[`GET`](https://redis.io/commands/get/)s the state of the bucket.
+Call the [schedule Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua)
+which first [`GET`](https://redis.io/commands/get/)s the *state* of the bucket.
 
-The bucket has state for the last slot scheduled and the number of tokens left for that slot.
+The bucket state contains the last slot scheduled and the number of tokens left for that slot.
 With a capacity of 1, having a `tokens_left_for_slot` variable makes no sense, but if there's
 capacity of 2 or more, it is possible that we will need to schedule multiple clients to the
 same slot.
@@ -273,3 +270,6 @@ Then we just sleep. Simple!
 # Contributing
 
 Please do!
+
+Feedback on the implementation, issues, and PRs are welcome.
+See `CONTRIBUTING.md` for more details.
