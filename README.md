@@ -137,9 +137,9 @@ With Lua scripts, this is how our flows ended up being:
 
 ### The semaphore implementation
 
-1. Run [create_semaphore.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/create_semaphore.lua) to create a list, which will be the foundation of our semaphore. This is skipped if it has already been created.
+1. Run [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L59:L109) to create a list, which will be the foundation of our semaphore. This is skipped if it has already been created.
 2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity. When it does, we pop from the list.
-3. Then run another [release_semaphore.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/release_semaphore.lua) to "release" the semaphore by adding back the capacity we popped.
+3. Then run another [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L143:L174) to "release" the semaphore by adding back the capacity we popped.
 
 So in total we make 3 calls to redis (we would have made 6 without the scripts),
 which are all non-blocking.
@@ -148,7 +148,7 @@ which are all non-blocking.
 
 Here, things are *even* simpler. The steps are:
 
-1. Run [schedule.lua](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua) to retrieve a wake-up time.
+1. Run [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/token_bucket.rs#L69:L159) to retrieve a wake-up time.
 2. Sleep until then.
 
 We make 1 call instead of 3, and both of these are also non-blocking.

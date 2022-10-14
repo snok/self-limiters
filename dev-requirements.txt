@@ -3,7 +3,7 @@ pytest-randomly
 pytest-asyncio
 pre-commit
 coverage
-maturin
+maturin[zig]
 uvloop
 coverage
 redis
