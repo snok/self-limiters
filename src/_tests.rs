@@ -5,9 +5,9 @@ mod tests {
 
     use redis::Client;
 
-    use crate::_utils::*;
     use crate::semaphore::ThreadState as SemaphoreThreadState;
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
+    use crate::utils::*;
 
     #[test]
     fn test_send_and_receive_via_channel_semaphore_threaded() -> SLResult<()> {

@@ -4,14 +4,14 @@ use pyo3::prelude::*;
 
 use token_bucket::TokenBucket;
 
-use crate::_errors::{MaxSleepExceededError, RedisError};
+use crate::errors::{MaxSleepExceededError, RedisError};
 use crate::semaphore::Semaphore;
 mod semaphore;
 
-mod _errors;
 mod _tests;
-mod _utils;
+mod errors;
 mod token_bucket;
+mod utils;
 
 #[pymodule]
 fn self_limiters(py: Python<'_>, m: &PyModule) -> PyResult<()> {

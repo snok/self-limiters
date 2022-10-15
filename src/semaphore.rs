@@ -1,6 +1,6 @@
 extern crate redis;
 
-use crate::_errors::SLError;
+use crate::errors::SLError;
 use log::{debug, info};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -8,9 +8,7 @@ use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Client, Script};
 use std::sync::mpsc::Receiver;
 
-use crate::_utils::{
-    now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
-};
+use crate::utils::{now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
