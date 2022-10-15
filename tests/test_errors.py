@@ -11,30 +11,26 @@ from .conftest import run, semaphore_factory, tokenbucket_factory
 logger = logging.getLogger(__name__)
 
 
-async def test_redis_error_on_init():
+@pytest.mark.parametrize('limiter', [semaphore_factory(redis_url='test'), tokenbucket_factory(redis_url='test')])
+async def test_redis_error_on_bad_connection_string(limiter):
     """
-    Make sure redis errors in the redis crate are propagated as tl.RedisError.
-
-    Test failure to parse connection string.
+    Redis errors should propagate as self_limiters.RedisError.
     """
     with pytest.raises(RedisError):
-        await run(semaphore_factory(redis_url='test'), 0)
-
-    with pytest.raises(RedisError):
-        await run(tokenbucket_factory(redis_url='test'), 0)
+        await run(limiter, 0)
 
 
 async def test_redis_error():
     """
-    Make sure redis errors in the redis crate are propagated as tl.RedisError.
-
-    Test failed redis operation in the main semaphore flow.
+    Trigger the equivalent of a runtime error in Redis,
+    to ensure that these types of redis errors are also
+    propagated correctly.
     """
     name = f'error-test-{uuid4()}'
     queue_name = f'__self-limiters:{name}'
 
     async def corrupt_queue():
-        # Wait 0.1 seconds then corrupt the queue
+        # Wait 0.1 seconds then destroy the queue
         await asyncio.sleep(0.3)
         r = Redis.from_url('redis://127.0.0.1:6389')
         await r.delete(queue_name)

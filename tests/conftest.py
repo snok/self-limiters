@@ -1,30 +1,18 @@
 import asyncio
 import logging
-import os
 from functools import partial
 from pathlib import Path
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
-import pytest as pytest
-import uvloop
 from self_limiters import Semaphore, TokenBucket
 
-uvloop.install()
+if TYPE_CHECKING:
+    from datetime import timedelta
 
 logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).parent.parent
-
-
-@pytest.fixture(autouse=True)
-def _change_test_dir():
-    os.chdir(REPO_ROOT)
-
-
-@pytest.fixture(autouse=True, scope='session')
-def _setup_logging():
-    log_format = '[%(asctime)s] [%(levelname)s] - %(message)s'
-    logging.basicConfig(level='DEBUG', format=log_format)
 
 
 def semaphore_factory(**kwargs) -> partial:
@@ -53,6 +41,10 @@ def tokenbucket_factory(**kwargs) -> partial:
         'redis_url': 'redis://127.0.0.1:6389',
     }
     return partial(TokenBucket, **{**defaults, **kwargs})
+
+
+def delta_to_seconds(t: 'timedelta') -> float:
+    return t.seconds + t.microseconds / 1_000_000
 
 
 async def run(pt: partial, duration: float) -> None:

@@ -1,41 +1,42 @@
 import asyncio
 import logging
 import re
-from asyncio.exceptions import TimeoutError
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
 from self_limiters import MaxSleepExceededError, Semaphore
 
-from .conftest import run, semaphore_factory
+from .conftest import delta_to_seconds, run, semaphore_factory
 
 logger = logging.getLogger(__name__)
 
 
-async def test_semaphore_runtimes():
-    n = 10
-    sleep = 0.4
+@pytest.mark.parametrize(
+    'n, capacity, sleep, timeout',
+    [
+        (10, 1, 0.1, 1),
+        (10, 2, 0.1, 0.5),
+        (10, 10, 0.1, 0.1),
+        (5, 1, 0.1, 0.5),
+    ],
+)
+async def test_semaphore_runtimes(n, capacity, sleep, timeout):
+    """
+    Make sure that the runtime of multiple Semaphore instances conform to our expectations.
 
-    # Ensure n tasks never completed in less the time it would take for n nodes to finish sleeping
+    The runtime should never fall below the expected lower bound. If we run 6 instances for
+    a Semaphore with a capacity of 5, where each instance sleeps 1 second, then it should
+    always take 1 >= seconds to run those.
+    """
     name = f'runtimes-{uuid4()}'
-    coro = asyncio.wait_for(
-        timeout=n * sleep,
-        fut=asyncio.gather(
-            *[asyncio.create_task(run(semaphore_factory(name=name, capacity=1), duration=sleep)) for _ in range(n)]
-        ),
-    )
+    tasks = [
+        asyncio.create_task(run(semaphore_factory(name=name, capacity=capacity), duration=sleep)) for _ in range(n)
+    ]
 
-    with pytest.raises(TimeoutError):
-        await coro
-
-    # Queue n tasks run no slower than ~0.1 seconds.
-    await asyncio.wait_for(
-        timeout=n * sleep * 1.05,
-        fut=asyncio.gather(
-            *[asyncio.create_task(run(semaphore_factory(capacity=1), duration=sleep)) for _ in range(n)]
-        ),
-    )
+    before = datetime.now()
+    await asyncio.gather(*tasks)
+    assert timeout <= delta_to_seconds(datetime.now() - before) <= timeout * 1.1
 
 
 async def test_sleep_is_non_blocking():
@@ -54,12 +55,15 @@ async def test_sleep_is_non_blocking():
 
 
 def test_class_attributes():
-    """
-    Check attributes are accessible, and check defaults.
-    """
+    """Check attributes are readable, but immutable."""
     semaphore = Semaphore(name='test', capacity=1)
-    assert semaphore.name
+
+    assert semaphore.name == '__self-limiters:test'
     assert semaphore.capacity == 1
+    assert semaphore.max_sleep == 0
+
+    with pytest.raises(AttributeError, match="attribute 'name' of 'self_limiters.Semaphore' objects is not writable"):
+        semaphore.name = 'test2'
 
 
 def test_repr():
@@ -95,27 +99,10 @@ def test_init_types(config, e):
         semaphore_factory(**config)()
 
 
-async def r(sleep, **kw):
-    async with semaphore_factory(**kw)():
-        await asyncio.sleep(sleep)
-
-
-@pytest.mark.parametrize(
-    'n,duration',
-    [
-        (100, 1),
-        (1000, 5),
-    ],
-)
-async def test_high_load(n, duration):
-    # This should pass, and should run under a threshold
-    name = uuid4().hex[:6]
-    start = datetime.now()
-    await asyncio.gather(*[asyncio.create_task(r(0, name=name)) for _ in range(n)])
-    assert datetime.now() - start < timedelta(seconds=duration)
-
-
+@pytest.mark.filterwarnings('ignore::RuntimeWarning')
 async def test_max_sleep():
     name = uuid4().hex[:6]
     with pytest.raises(MaxSleepExceededError, match='Max sleep exceeded when waiting for Semaphore'):
-        await asyncio.gather(*[asyncio.create_task(r(1, name=name, max_sleep=1)) for _ in range(3)])
+        await asyncio.gather(
+            *[asyncio.create_task(run(semaphore_factory(name=name, max_sleep=1), 1)) for _ in range(3)]
+        )
