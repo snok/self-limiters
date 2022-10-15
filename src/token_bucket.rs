@@ -63,7 +63,8 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
     let mut connection = ts.client.get_async_connection().await?;
 
     // Retrieve slot
-    let slot: u64 = Script::new(r"
+    let slot: u64 = Script::new(
+        r"
         --- Script called from the Semaphore implementation.
         --- partially modelled after https://github.com/Tinche/aiosteady
         ---
@@ -154,13 +155,14 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
         redis.call('SETEX', data_key, 30, string.format('%d %d', slot, tokens))
 
         return slot
-        ")
-        .key(&ts.name)
-        .arg(ts.capacity) // capacity
-        .arg(ts.frequency * 1000.0) // refill rate in ms
-        .arg(ts.amount) // refill amount
-        .invoke_async(&mut connection)
-        .await?;
+        ",
+    )
+    .key(&ts.name)
+    .arg(ts.capacity) // capacity
+    .arg(ts.frequency * 1000.0) // refill rate in ms
+    .arg(ts.amount) // refill amount
+    .invoke_async(&mut connection)
+    .await?;
 
     let now = now_millis()?;
     let sleep_duration = {
@@ -184,10 +186,7 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
         )));
     }
 
-    debug!(
-        "Retrieved slot. Sleeping for {}.",
-        sleep_duration.as_secs_f32()
-    );
+    debug!("Retrieved slot. Sleeping for {}.", sleep_duration.as_secs_f32());
     tokio::time::sleep(sleep_duration).await;
 
     Ok(())
@@ -206,9 +205,7 @@ impl TokenBucket {
         max_sleep: Option<f32>,
     ) -> PyResult<Self> {
         if refill_frequency <= 0.0 {
-            return Err(PyValueError::new_err(
-                "Refill frequency must be greater than 0",
-            ));
+            return Err(PyValueError::new_err("Refill frequency must be greater than 0"));
         }
         Ok(Self {
             capacity,

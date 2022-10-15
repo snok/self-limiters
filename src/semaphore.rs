@@ -110,10 +110,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     .invoke_async(&mut connection)
     .await?
     {
-        info!(
-            "Created new semaphore queue with a capacity of {}",
-            &ts.capacity
-        );
+        info!("Created new semaphore queue with a capacity of {}", &ts.capacity);
     }
 
     // Wait for our turn - this waits non-blockingly until we're free to proceed
@@ -182,12 +179,7 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
 impl Semaphore {
     /// Create a new class instance.
     #[new]
-    fn new(
-        name: String,
-        capacity: u32,
-        max_sleep: Option<f32>,
-        redis_url: Option<&str>,
-    ) -> PyResult<Self> {
+    fn new(name: String, capacity: u32, max_sleep: Option<f32>, redis_url: Option<&str>) -> PyResult<Self> {
         Ok(Self {
             capacity,
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
@@ -199,9 +191,7 @@ impl Semaphore {
     fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
 
-        future_into_py(py, async {
-            Ok(create_and_acquire_semaphore(receiver).await?)
-        })
+        future_into_py(py, async { Ok(create_and_acquire_semaphore(receiver).await?) })
     }
 
     /// Return capacity to the Semaphore on exit.

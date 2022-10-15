@@ -27,12 +27,7 @@ pub fn validate_redis_url(redis_url: Option<&str>) -> SLResult<Client> {
     };
     let client = match Client::open(url) {
         Ok(client) => client,
-        Err(e) => {
-            return Err(SLError::Redis(format!(
-                "Failed to open redis client: {}",
-                e
-            )))
-        }
+        Err(e) => return Err(SLError::Redis(format!("Failed to open redis client: {}", e))),
     };
     Ok(client)
 }
