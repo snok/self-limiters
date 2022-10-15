@@ -21,13 +21,11 @@ pub fn now_millis() -> SLResult<u64> {
 }
 
 pub fn validate_redis_url(redis_url: Option<&str>) -> SLResult<Client> {
-    let url = match parse_redis_url(redis_url.unwrap_or(REDIS_DEFAULT_URL)) {
-        Some(url) => url,
-        None => return Err(SLError::Redis(String::from("Failed to parse redis url"))),
-    };
-    let client = match Client::open(url) {
-        Ok(client) => client,
-        Err(e) => return Err(SLError::Redis(format!("Failed to open redis client: {}", e))),
-    };
-    Ok(client)
+    match parse_redis_url(redis_url.unwrap_or(REDIS_DEFAULT_URL)) {
+        Some(url) => match Client::open(url) {
+            Ok(client) => Ok(client),
+            Err(e) => Err(SLError::Redis(format!("Failed to open redis client: {}", e))),
+        },
+        None => Err(SLError::Redis(String::from("Failed to parse redis url"))),
+    }
 }
