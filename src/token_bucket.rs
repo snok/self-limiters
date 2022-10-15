@@ -9,10 +9,8 @@ use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{Client, Script};
 
-use crate::_errors::SLError;
-use crate::_utils::{
-    now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX,
-};
+use crate::errors::SLError;
+use crate::utils::{now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
