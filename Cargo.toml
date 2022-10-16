@@ -14,7 +14,7 @@ pyo3-log = ">=0.7.0"
 log = ">=0.4.17"
 pyo3-asyncio = { version = ">=0.17.0", features = ["attributes", "tokio-runtime"] }
 tokio = ">=1.20.1"
-redis = { version=">=0.21.5", features = ["tokio-comp"] }
+redis = { version=">=0.21.5", features = ["aio", "tokio-comp"] }
 
 [dev-dependencies]
 cargo-llvm-cov = { version = ">=0.4.1" }
