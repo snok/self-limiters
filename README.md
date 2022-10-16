@@ -11,8 +11,8 @@ It implements a [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming
 limit the number of concurrent requests to an API (or other resources). For example if you can only
 send 5 concurrent requests.
 
-Then it implements the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket) which can be used
-to limit the number of requests made in a time interval. For example if you're restricted to 10 requests
+It also implements the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket) which can be used
+to limit the number of requests made in a given time interval. For example if you're restricted to 10 requests
 per second.
 
 Both limiters are async, FIFO, and distributed using Redis. You should probably only use this if you need
@@ -45,6 +45,7 @@ async with Semaphore(name="", capacity=5, max_sleep=60, redis_url=""):
 ```
 
 We use [`blpop`](https://redis.io/commands/blpop/) to wait for the semaphore to be freed up, under the hood, which is non-blocking.
+
 If you specify a non-zero `max_sleep`, a `MaxSleepExceededError` will be raised if `blpop` waits for longer than that specified value.
 
 ### Token bucket
@@ -68,10 +69,12 @@ async with TokenBucket(
 ```
 
 The limiter first estimates when there will be capacity in the bucket - i.e., when it's this instances turn to go,
-then async sleeps until then. If `max_sleep` is set and the estimated sleep time exceeds this, a `MaxSleepExceededError`
+then async sleeps until then.
+
+If `max_sleep` is set and the estimated sleep time exceeds this, a `MaxSleepExceededError`
 is raised immediately.
 
-### Using them as decorators
+### As a decorator
 
 The package doesn't ship any decorators, but if you would
 like to limit the rate at which a whole function is run,
@@ -103,14 +106,15 @@ def fetch_foo(id: UUID) -> Foo:
 # Implementation and performance breakdown
 
 The library is written in Rust (for fun) and relies on [Lua](http://www.lua.org/about.html)
-scripts to greatly improve the performance of each implementation.
+scripts and [pipelining](https://docs.rs/redis/0.22.0/redis/struct.Pipeline.html) to
+improve the performance of each implementation.
 
 Redis lets users upload and execute Lua scripts on the server directly, meaning we can write
-the entire token bucket logic in Lua. This present a couple of really great benefits:
+e.g., the entire token bucket logic in Lua. This present a couple of nice benefits:
 
 - Since they are executed on the redis instance, we can make 1 request to redis
   where we would otherwise have to make 3 or 4. The time saved by reducing
-  the number of requests is massive.
+  the number of requests is significant.
 
 - Redis is single-threaded and guarantees atomic execution of scripts, meaning
   we don't have to worry about data races. In a prior iteration, when we had to make 4 requests
@@ -131,7 +135,7 @@ This is how each implementation has ended up looking:
    This script is idempotent, and skipped if it has already been created.
 
 2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity, and pop from the list when it does.
-3. Then run another [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L143:L174) to release the semaphore by adding back the capacity.
+3. Then run a [pipelined command](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L139:L144) to release the semaphore by adding back the capacity.
 
 So in total we make 3 calls to redis, where we would have made 6 without the scripts, which are all non-blocking.
 
@@ -172,7 +176,6 @@ The flow can be broken down as follows:
 
 <img width=500 src="docs/semaphore.png"></img>
 
-
 The initial [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L59:L109)
 first checks if the redis list we will build the semaphore on exists or not.
 It does this by calling [`SETNX`](https://redis.io/commands/setnx/) on the key of the queue plus a postfix
@@ -194,8 +197,9 @@ Once the list/queue has been created, we [`BLPOP`](https://redis.io/commands/blp
  our turn. `BLPOP` is FIFO by default. We also make sure to specify the `max_sleep` based on the initialized
  semaphore instance setting. If nothing was passed we allow sleeping forever.
 
-On `__aexit__` we call another script to [`RPUSH`](https://redis.io/commands/rpush/) a `1` value back into the queue
- (i.e., release the semaphore) and set an expiry on the queue and the string value we called `SETNX` on.
+On `__aexit__` we run three commands in a pipelined query. We [`RPUSH`](https://redis.io/commands/rpush/) a `1`
+back into the queue to "release" the semaphore, and set an expiry on the queue and the string value we called
+`SETNX` on.
 <br><br>
 The expires are a half measure for dealing with dropped capacity. If a node holding the semaphore dies,
 the capacity might never be returned. If, however, there is no one using the semaphore for the duration of the
