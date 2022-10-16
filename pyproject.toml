@@ -7,7 +7,21 @@ requires-python = ">=3.8"
 license = { file = "LICENSE", type = 'BSD-3' }
 homepage = "https://github.com/sondrelg/self-limiters"
 repository = "https://github.com/sondrelg/self-limiters"
-keywords = ["distributed", "async", "rate-limit", "rate", "limit", "limiting", "redis", "rust"]
+keywords = [
+    "distributed",
+    "async",
+    "rate-limit",
+    "rate",
+    "limit",
+    "limiting",
+    "redis",
+    "rust",
+    "semaphore",
+    "token",
+    "leaky",
+    "bucket",
+    "tokenbucket",
+]
 dependencies = []
 classifiers = [
     "Development Status :: 4 - Beta",
