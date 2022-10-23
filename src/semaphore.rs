@@ -15,6 +15,7 @@ use crate::utils::{now_millis, send_shared_state, validate_redis_url, SLResult, 
 pub struct ThreadState {
     pub(crate) client: Client,
     pub(crate) name: String,
+    pub(crate) expiry: usize,
     pub(crate) capacity: u32,
     pub(crate) max_sleep: f32,
 }
@@ -24,6 +25,7 @@ impl ThreadState {
         Self {
             client: slf.client.clone(),
             name: slf.name.clone(),
+            expiry: slf.expiry,
             capacity: slf.capacity,
             max_sleep: slf.max_sleep,
         }
@@ -43,6 +45,8 @@ pub struct Semaphore {
     name: String,
     #[pyo3(get)]
     max_sleep: f32,
+    #[pyo3(get)]
+    expiry: usize,
     client: Client,
 }
 
@@ -138,8 +142,8 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
     // *We don't care about this being atomic
     redis::pipe()
         .lpush(&ts.name, 1)
-        .expire(&ts.name, 30)
-        .expire(format!("{}-exists", &ts.name), 30)
+        .expire(&ts.name, ts.expiry)
+        .expire(format!("{}-exists", &ts.name), ts.expiry)
         .query_async(&mut connection)
         .await?;
 
@@ -151,11 +155,18 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
 impl Semaphore {
     /// Create a new class instance.
     #[new]
-    fn new(name: String, capacity: u32, max_sleep: Option<f32>, redis_url: Option<&str>) -> PyResult<Self> {
+    fn new(
+        name: String,
+        capacity: u32,
+        max_sleep: Option<f32>,
+        expiry: Option<usize>,
+        redis_url: Option<&str>,
+    ) -> PyResult<Self> {
         Ok(Self {
             capacity,
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             max_sleep: max_sleep.unwrap_or(0.0),
+            expiry: expiry.unwrap_or(30),
             client: validate_redis_url(redis_url)?,
         })
     }
