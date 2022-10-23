@@ -21,6 +21,12 @@ pub struct ThreadState {
 }
 
 impl ThreadState {
+    pub(crate) fn exists_key(&self) -> String {
+        format!("{}-exists", self.name)
+    }
+}
+
+impl ThreadState {
     fn from(slf: &PyRef<Semaphore>) -> Self {
         Self {
             client: slf.client.clone(),
@@ -70,6 +76,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
         ---
         --- keys:
         --- * key: The key to use for the list
+        --- * existskey: The key to use for the string we use to check if the lists exists
         ---
         --- args:
         --- * capacity: The capacity of the semaphore (i.e., the length of the list)
@@ -81,6 +88,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
 
         -- Init config variables
         local key = tostring(KEYS[1])
+        local existskey = tostring(KEYS[2])
         local capacity = tonumber(ARGV[1])
 
         -- Check if list exists
@@ -92,7 +100,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
         -- all three elements (popping == acquiring the semaphore), the list stops 'existing'
         -- once empty. In other words, EXISTS is not viable, so this is a workaround.
         -- If you have better suggestions for how to achieve this, please submit a PR.
-        local does_not_exist = redis.call('SETNX', string.format('(%s)-exists', key), 1)
+        local does_not_exist = redis.call('SETNX', string.format(existskey, key), 1)
 
         -- Create the list if none exists
         if does_not_exist == 1 then
@@ -110,6 +118,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
         return false",
     )
     .key(&ts.name)
+    .key(&ts.exists_key())
     .arg(ts.capacity)
     .invoke_async(&mut connection)
     .await?
@@ -143,7 +152,7 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
     redis::pipe()
         .lpush(&ts.name, 1)
         .expire(&ts.name, ts.expiry)
-        .expire(format!("{}-exists", &ts.name), ts.expiry)
+        .expire(&ts.exists_key(), ts.expiry)
         .query_async(&mut connection)
         .await?;
 
