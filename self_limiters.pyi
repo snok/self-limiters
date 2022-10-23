@@ -28,12 +28,14 @@ class Semaphore:
         name: str,
         capacity: int,
         max_sleep: Optional[float] = None,  # Set to 0.0 when None is passed. In seconds.
+        expiry: Optional[int] = None,  # Set to 30 when None is passed. In seconds.
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
     ) -> None: ...
 
     capacity: int
-    name: bytes
-    max_sleep: int
+    name: str
+    max_sleep: float
+    expiry: int
 
     async def __aenter__(self) -> None: ...
     async def __aexit__(
