@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import uuid4
 
 import pytest
+from redis.asyncio.client import Monitor, Redis
 from self_limiters import MaxSleepExceededError, Semaphore
 
 from .conftest import delta_to_seconds, run, semaphore_factory
@@ -106,3 +107,49 @@ async def test_max_sleep():
         await asyncio.gather(
             *[asyncio.create_task(run(semaphore_factory(name=name, max_sleep=1), 1)) for _ in range(3)]
         )
+
+
+async def test_redis_instructions():
+    r = Redis.from_url('redis://127.0.0.1:6389')
+    name = uuid4().hex
+
+    m: Monitor
+    async with r.monitor() as m:
+        await m.connect()
+        await run(semaphore_factory(name=name, expiry=1), 0)
+
+        # We expect the eval to generate 7 calls
+        commands = [
+            # EVALSHA
+            str(await m.connection.read_response()),
+            # SETNX
+            str(await m.connection.read_response()),
+            # RPUSH
+            str(await m.connection.read_response()),
+            # BLPOP
+            str(await m.connection.read_response()),
+            # LPUSH
+            str(await m.connection.read_response()),
+            # EXPIRE
+            str(await m.connection.read_response()),
+            # EXPIRE
+            str(await m.connection.read_response()),
+        ]
+
+        # Make sure there are no other commands generated
+        with pytest.raises(asyncio.TimeoutError):
+            # This will time out if there are no other commands
+            await asyncio.wait_for(timeout=1, fut=m.connection.read_response())
+
+        # Make sure each command conforms to our expectations
+        assert 'EVALSHA' in commands[0]
+        assert 'SETNX' in commands[1]
+        assert f'__self-limiters:{name}-exists' in commands[1]
+        assert 'RPUSH' in commands[2]
+        assert f'__self-limiters:{name}' in commands[2]
+        assert 'BLPOP' in commands[3]
+        assert 'LPUSH' in commands[4]
+        assert 'EXPIRE' in commands[5]
+        assert f'__self-limiters:{name}' in commands[5]
+        assert 'EXPIRE' in commands[6]
+        assert f'__self-limiters:{name}-exists' in commands[6]
