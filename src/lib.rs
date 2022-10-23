@@ -46,6 +46,7 @@ mod tests {
             name: name.to_owned(),
             capacity: capacity.to_owned(),
             max_sleep: max_sleep.to_owned(),
+            expiry: 30,
         })?;
         let copied_ts = thread::spawn(move || receiver.recv().unwrap()).join().unwrap();
         assert_eq!(copied_ts.name, name);
