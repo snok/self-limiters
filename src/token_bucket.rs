@@ -1,3 +1,5 @@
+use bb8_redis::bb8::Pool;
+use bb8_redis::RedisConnectionManager;
 use log::debug;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
@@ -7,10 +9,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
-use redis::{Client, Script};
+use redis::Script;
 
 use crate::errors::SLError;
-use crate::utils::{now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX};
+use crate::utils::{
+    create_connection_manager, create_connection_pool, now_millis, send_shared_state, SLResult, REDIS_KEY_PREFIX,
+};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
@@ -19,7 +23,7 @@ pub struct ThreadState {
     pub(crate) frequency: f32,
     pub(crate) amount: u32,
     pub(crate) max_sleep: f32,
-    pub(crate) client: Client,
+    pub(crate) connection_pool: Pool<RedisConnectionManager>,
     pub(crate) name: String,
 }
 
@@ -30,7 +34,7 @@ impl ThreadState {
             frequency: slf.refill_frequency,
             amount: slf.refill_amount,
             max_sleep: slf.max_sleep,
-            client: slf.client.clone(),
+            connection_pool: slf.connection_pool.clone(),
             name: slf.name.clone(),
         }
     }
@@ -52,7 +56,7 @@ pub struct TokenBucket {
     #[pyo3(get)]
     name: String,
     max_sleep: f32,
-    client: Client,
+    connection_pool: Pool<RedisConnectionManager>,
 }
 
 async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
@@ -60,7 +64,7 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
     let ts = receiver.recv()?;
 
     // Connect to redis
-    let mut connection = ts.client.get_async_connection().await?;
+    let mut connection = ts.connection_pool.get().await?;
 
     // Retrieve slot
     let slot: u64 = Script::new(
@@ -161,7 +165,7 @@ async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
     .arg(ts.capacity) // capacity
     .arg(ts.frequency * 1000.0) // refill rate in ms
     .arg(ts.amount) // refill amount
-    .invoke_async(&mut connection)
+    .invoke_async(&mut *connection)
     .await?;
 
     let now = now_millis()?;
@@ -207,13 +211,19 @@ impl TokenBucket {
         if refill_frequency <= 0.0 {
             return Err(PyValueError::new_err("Refill frequency must be greater than 0"));
         }
+        // Create redis connection manager
+        let manager = create_connection_manager(redis_url)?;
+
+        // Create connection pool
+        let pool = create_connection_pool(manager, capacity + 1)?;
+
         Ok(Self {
             capacity,
             refill_amount,
             refill_frequency,
             max_sleep: max_sleep.unwrap_or(0.0),
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
-            client: validate_redis_url(redis_url)?,
+            connection_pool: pool,
         })
     }
 
