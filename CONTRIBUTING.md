@@ -19,6 +19,9 @@ a lua script by calling `redis-cli -u redis://127.0.0.1:6389 --ldb --eval src/se
 
 Just type `help` in the debugger for options.
 
+Another option is to run `MONITOR` in the redis-cli before running the relevant code,
+and checking the output of calls made.
+
 ## Setting up the environment
 
 1. Create a venv
