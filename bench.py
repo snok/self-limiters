@@ -63,7 +63,7 @@ def main(
     t: partial
     if type.startswith('s'):
         typer.echo('Testing semaphore...')
-        t = partial(Semaphore, capacity=capacity, max_sleep=max_sleep, redis_url=redis_url)
+        t = partial(Semaphore, capacity=capacity, max_sleep=max_sleep, redis_url=redis_url, connection_pool_size=30)
         offset = 0.0
     elif type.startswith('t'):
         typer.echo('Testing token bucket...')
@@ -74,6 +74,7 @@ def main(
             capacity=capacity,
             max_sleep=max_sleep,
             redis_url=redis_url,
+            connection_pool_size=30,
         )
         offset = 0.01 * count
     else:

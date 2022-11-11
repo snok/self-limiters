@@ -27,8 +27,6 @@ mod tests {
     use std::thread;
     use std::time::Duration;
 
-    use redis::Client;
-
     use crate::semaphore::ThreadState as SemaphoreThreadState;
     use crate::token_bucket::ThreadState as TokenBucketThreadState;
     use crate::utils::*;

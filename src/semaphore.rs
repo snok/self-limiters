@@ -26,12 +26,6 @@ pub struct ThreadState {
 }
 
 impl ThreadState {
-    pub(crate) fn exists_key(&self) -> String {
-        format!("{}-exists", self.name)
-    }
-}
-
-impl ThreadState {
     fn from(slf: &PyRef<Semaphore>) -> Self {
         Self {
             connection_pool: slf.connection_pool.clone(),
@@ -40,6 +34,11 @@ impl ThreadState {
             capacity: slf.capacity,
             max_sleep: slf.max_sleep,
         }
+    }
+
+    /// Key (re)use in Lua scripts to determine if Semaphore exists or not
+    pub(crate) fn exists_key(&self) -> String {
+        format!("{}-exists", self.name)
     }
 }
 
@@ -155,9 +154,9 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
 #[pyo3(module = "self_limiters")]
 pub struct Semaphore {
     #[pyo3(get)]
-    capacity: u32,
-    #[pyo3(get)]
     name: String,
+    #[pyo3(get)]
+    capacity: u32,
     #[pyo3(get)]
     max_sleep: f32,
     #[pyo3(get)]
@@ -175,12 +174,13 @@ impl Semaphore {
         max_sleep: Option<f32>,
         expiry: Option<usize>,
         redis_url: Option<&str>,
+        connection_pool_size: Option<u32>,
     ) -> PyResult<Self> {
         // Create redis connection manager
         let manager = create_connection_manager(redis_url)?;
 
         // Create connection pool
-        let pool = create_connection_pool(manager, capacity + 1)?;
+        let pool = create_connection_pool(manager, connection_pool_size.unwrap_or(15))?;
 
         Ok(Self {
             capacity,
@@ -197,7 +197,6 @@ impl Semaphore {
         future_into_py(py, async { Ok(create_and_acquire_semaphore(receiver).await?) })
     }
 
-    /// Return capacity to the Semaphore on exit.
     #[args(_a = "*")]
     fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;

@@ -86,8 +86,8 @@ jobs:
           source .venv/bin/activate
           maturin build --release --locked --out ./ --strip  --find-interpreter --no-default-features
           pip install ./self_limiters-* --force-reinstall
-          python bench.py tb --count 100 --iterations 30 --target 0.1
-          python bench.py s --count 100 --iterations 30 --target 1.2
+          python bench.py tb --count 30 --iterations 30 --target 0.25
+          python bench.py s --count 30 --iterations 30 --target 1.5
         if: matrix.python-version == '3.10'
       - uses: codecov/codecov-action@v3
         with:
