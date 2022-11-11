@@ -37,7 +37,7 @@ async def test_semaphore_runtimes(n, capacity, sleep, timeout):
 
     before = datetime.now()
     await asyncio.gather(*tasks)
-    assert timeout <= delta_to_seconds(datetime.now() - before) <= timeout * 1.5
+    assert timeout <= delta_to_seconds(datetime.now() - before)
 
 
 async def test_sleep_is_non_blocking():
