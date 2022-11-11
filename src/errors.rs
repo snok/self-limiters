@@ -1,7 +1,9 @@
+use bb8_redis::bb8::RunError;
 use std::io::Error;
 use std::sync::mpsc::{RecvError, SendError};
 use std::time::SystemTimeError;
 
+use crate::semaphore;
 use pyo3::create_exception;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
@@ -68,6 +70,13 @@ impl From<Error> for SLError {
 // SystemTimeError could be raised when calling SystemTime.now()
 impl From<SystemTimeError> for SLError {
     fn from(e: SystemTimeError) -> Self {
+        Self::RuntimeError(e.to_string())
+    }
+}
+
+// RunError<RedisError> could happen when creating a connection pool
+impl From<RunError<semaphore::redis::RedisError>> for SLError {
+    fn from(e: RunError<semaphore::redis::RedisError>) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }

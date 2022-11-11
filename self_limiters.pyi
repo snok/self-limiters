@@ -10,6 +10,7 @@ class TokenBucket:
         refill_amount: int,
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
         max_sleep: Optional[float] = None,  # will be set to 0.0 if None. In seconds.
+        connection_pool_size: Optional[int] = None,  # Will be set to 15 if None
     ) -> None: ...
 
     capacity: int
@@ -30,6 +31,7 @@ class Semaphore:
         max_sleep: Optional[float] = None,  # Set to 0.0 when None is passed. In seconds.
         expiry: Optional[int] = None,  # Set to 30 when None is passed. In seconds.
         redis_url: Optional[str] = None,  # will be set as "redis://127.0.0.1:6379" if None
+        connection_pool_size: Optional[int] = None,  # Will be set to 15 if None
     ) -> None: ...
 
     capacity: int

@@ -1,19 +1,24 @@
-extern crate redis;
+pub extern crate redis;
 
 use crate::errors::SLError;
+use bb8_redis::bb8::Pool;
 use log::{debug, info};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
-use redis::{AsyncCommands, Client, Script};
+use redis::{AsyncCommands, Script};
+
+use bb8_redis::RedisConnectionManager;
 use std::sync::mpsc::Receiver;
 
-use crate::utils::{now_millis, send_shared_state, validate_redis_url, SLResult, REDIS_KEY_PREFIX};
+use crate::utils::{
+    create_connection_manager, create_connection_pool, now_millis, send_shared_state, SLResult, REDIS_KEY_PREFIX,
+};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
 pub struct ThreadState {
-    pub(crate) client: Client,
+    pub(crate) connection_pool: Pool<RedisConnectionManager>,
     pub(crate) name: String,
     pub(crate) expiry: usize,
     pub(crate) capacity: u32,
@@ -21,39 +26,20 @@ pub struct ThreadState {
 }
 
 impl ThreadState {
-    pub(crate) fn exists_key(&self) -> String {
-        format!("{}-exists", self.name)
-    }
-}
-
-impl ThreadState {
     fn from(slf: &PyRef<Semaphore>) -> Self {
         Self {
-            client: slf.client.clone(),
+            connection_pool: slf.connection_pool.clone(),
             name: slf.name.clone(),
             expiry: slf.expiry,
             capacity: slf.capacity,
             max_sleep: slf.max_sleep,
         }
     }
-}
 
-/// Async context manager useful for controlling client traffic
-/// in situations where you need to limit traffic to `n` requests concurrently.
-/// For example, when you can only have 2 active requests simultaneously.
-#[pyclass(frozen)]
-#[pyo3(name = "Semaphore")]
-#[pyo3(module = "self_limiters")]
-pub struct Semaphore {
-    #[pyo3(get)]
-    capacity: u32,
-    #[pyo3(get)]
-    name: String,
-    #[pyo3(get)]
-    max_sleep: f32,
-    #[pyo3(get)]
-    expiry: usize,
-    client: Client,
+    /// Key (re)use in Lua scripts to determine if Semaphore exists or not
+    pub(crate) fn exists_key(&self) -> String {
+        format!("{}-exists", self.name)
+    }
 }
 
 async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
@@ -61,7 +47,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     let ts = receiver.recv()?;
 
     // Connect to redis
-    let mut connection = ts.client.get_async_connection().await?;
+    let mut connection = ts.connection_pool.get().await?;
 
     // Define queue if it doesn't already exist
     if Script::new(
@@ -120,7 +106,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     .key(&ts.name)
     .key(&ts.exists_key())
     .arg(ts.capacity)
-    .invoke_async(&mut connection)
+    .invoke_async(&mut *connection)
     .await?
     {
         info!("Created new semaphore queue with a capacity of {}", &ts.capacity);
@@ -145,7 +131,7 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
     let ts = receiver.recv()?;
 
     // Connect to redis
-    let mut connection = ts.client.get_async_connection().await?;
+    let mut connection = ts.connection_pool.get().await?;
 
     // Push capacity back to the semaphore
     // *We don't care about this being atomic
@@ -153,11 +139,29 @@ async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
         .lpush(&ts.name, 1)
         .expire(&ts.name, ts.expiry)
         .expire(&ts.exists_key(), ts.expiry)
-        .query_async(&mut connection)
+        .query_async(&mut *connection)
         .await?;
 
     debug!("Released semaphore");
     Ok(())
+}
+
+/// Async context manager useful for controlling client traffic
+/// in situations where you need to limit traffic to `n` requests concurrently.
+/// For example, when you can only have 2 active requests simultaneously.
+#[pyclass(frozen)]
+#[pyo3(name = "Semaphore")]
+#[pyo3(module = "self_limiters")]
+pub struct Semaphore {
+    #[pyo3(get)]
+    name: String,
+    #[pyo3(get)]
+    capacity: u32,
+    #[pyo3(get)]
+    max_sleep: f32,
+    #[pyo3(get)]
+    expiry: usize,
+    connection_pool: Pool<RedisConnectionManager>,
 }
 
 #[pymethods]
@@ -170,13 +174,20 @@ impl Semaphore {
         max_sleep: Option<f32>,
         expiry: Option<usize>,
         redis_url: Option<&str>,
+        connection_pool_size: Option<u32>,
     ) -> PyResult<Self> {
+        // Create redis connection manager
+        let manager = create_connection_manager(redis_url)?;
+
+        // Create connection pool
+        let pool = create_connection_pool(manager, connection_pool_size.unwrap_or(15))?;
+
         Ok(Self {
             capacity,
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             max_sleep: max_sleep.unwrap_or(0.0),
             expiry: expiry.unwrap_or(30),
-            client: validate_redis_url(redis_url)?,
+            connection_pool: pool,
         })
     }
 
@@ -186,7 +197,6 @@ impl Semaphore {
         future_into_py(py, async { Ok(create_and_acquire_semaphore(receiver).await?) })
     }
 
-    /// Return capacity to the Semaphore on exit.
     #[args(_a = "*")]
     fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
         let receiver = send_shared_state(ThreadState::from(&slf))?;
