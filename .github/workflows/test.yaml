@@ -14,7 +14,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - run: pip install pre-commit
       - uses: actions/cache@v3
         id: pre-commit-cache
@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.8", "3.9", "3.10", "3.11.0" ]
+        python-version: [ "3.8", "3.9", "3.10", "3.11.1" ]
     services:
       redis:
         image: redis:6.2.5-alpine
@@ -88,8 +88,8 @@ jobs:
           pip install ./self_limiters-* --force-reinstall
           python bench.py tb --count 30 --iterations 30 --target 0.25
           python bench.py s --count 30 --iterations 30 --target 1.5
-        if: matrix.python-version == '3.10'
+        if: matrix.python-version == '3.11'
       - uses: codecov/codecov-action@v3
         with:
           files: coverage.lcov,coverage.xml
-        if: matrix.python-version == '3.10'
+        if: matrix.python-version == '3.11'
