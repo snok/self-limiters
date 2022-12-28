@@ -128,8 +128,6 @@ async def test_redis_instructions():
             str(await m.connection.read_response()),
             # BLPOP
             str(await m.connection.read_response()),
-            # PING - from connection manager
-            str(await m.connection.read_response()),
             # LPUSH
             str(await m.connection.read_response()),
             # EXPIRE
@@ -150,8 +148,8 @@ async def test_redis_instructions():
         assert 'RPUSH' in commands[2]
         assert f'__self-limiters:{name}' in commands[2]
         assert 'BLPOP' in commands[3]
-        assert 'LPUSH' in commands[5]
+        assert 'LPUSH' in commands[4]
+        assert 'EXPIRE' in commands[5]
+        assert f'__self-limiters:{name}' in commands[5]
         assert 'EXPIRE' in commands[6]
-        assert f'__self-limiters:{name}' in commands[6]
-        assert 'EXPIRE' in commands[7]
-        assert f'__self-limiters:{name}-exists' in commands[7]
+        assert f'__self-limiters:{name}-exists' in commands[6]
