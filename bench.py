@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timedelta
 from functools import partial
 from statistics import median
@@ -9,6 +10,9 @@ from uuid import uuid4
 
 import typer
 from self_limiters import Semaphore, TokenBucket
+
+FORMAT = '[%(asctime)s] %(message)s'
+logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 
 async def run(t: Union[Semaphore, TokenBucket], sleep: float):
