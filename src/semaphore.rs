@@ -10,7 +10,8 @@ use crate::errors::SLError;
 use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
 struct ThreadState {
-    connection_pool: Pool<RedisConnectionManager>,
+    open_connection_pool: Pool<RedisConnectionManager>,
+    return_connection_pool: Pool<RedisConnectionManager>,
     name: String,
     expiry: usize,
     capacity: u32,
@@ -20,7 +21,8 @@ struct ThreadState {
 impl ThreadState {
     fn from(slf: &Semaphore) -> Self {
         Self {
-            connection_pool: slf.connection_pool.clone(),
+            open_connection_pool: slf.open_connection_pool.clone(),
+            return_connection_pool: slf.return_connection_pool.clone(),
             name: slf.name.clone(),
             expiry: slf.expiry,
             capacity: slf.capacity,
@@ -36,7 +38,7 @@ impl ThreadState {
 
 async fn create_and_acquire_semaphore(ts: ThreadState) -> SLResult<()> {
     // Connect to redis
-    let mut connection = ts.connection_pool.get().await?;
+    let mut connection = ts.open_connection_pool.get().await?;
 
     // Define queue if it doesn't already exist
     if Script::new(
@@ -112,7 +114,7 @@ async fn create_and_acquire_semaphore(ts: ThreadState) -> SLResult<()> {
 
 async fn release_semaphore(ts: ThreadState) -> SLResult<()> {
     // Connect to redis
-    let mut connection = ts.connection_pool.get().await?;
+    let mut connection = ts.return_connection_pool.get().await?;
 
     // Push capacity back to the semaphore
     // We don't care about this being atomic
@@ -142,7 +144,8 @@ pub(crate) struct Semaphore {
     max_sleep: f32,
     #[pyo3(get)]
     expiry: usize,
-    connection_pool: Pool<RedisConnectionManager>,
+    open_connection_pool: Pool<RedisConnectionManager>,
+    return_connection_pool: Pool<RedisConnectionManager>,
 }
 
 #[pymethods]
@@ -160,17 +163,20 @@ impl Semaphore {
         debug!("Creating new Semaphore instance");
 
         // Create redis connection manager
-        let manager = create_connection_manager(redis_url)?;
+        let open_manager = create_connection_manager(redis_url)?;
+        let return_manager = create_connection_manager(redis_url)?;
 
         // Create connection pool
-        let pool = create_connection_pool(manager, connection_pool_size.unwrap_or(15))?;
+        let open_pool = create_connection_pool(open_manager, connection_pool_size.unwrap_or(15))?;
+        let return_pool = create_connection_pool(return_manager, connection_pool_size.unwrap_or(15))?;
 
         Ok(Self {
             capacity,
             name: format!("{}{}", REDIS_KEY_PREFIX, name),
             max_sleep: max_sleep.unwrap_or(0.0),
             expiry: expiry.unwrap_or(30),
-            connection_pool: pool,
+            open_connection_pool: open_pool,
+            return_connection_pool: return_pool,
         })
     }
 
