@@ -23,7 +23,7 @@ struct ThreadState {
 }
 
 impl ThreadState {
-    fn from(slf: &PyRef<TokenBucket>) -> Self {
+    fn from(slf: &TokenBucket) -> Self {
         Self {
             capacity: slf.capacity,
             frequency: slf.refill_frequency,
@@ -135,9 +135,9 @@ async fn schedule_and_sleep(ts: ThreadState) -> SLResult<()> {
         ",
     )
     .key(&ts.name)
-    .arg(ts.capacity) // capacity
-    .arg(ts.frequency * 1000.0) // refill rate in ms
-    .arg(ts.amount) // refill amount
+    .arg(ts.capacity)
+    .arg(ts.frequency * 1000.0) // in ms
+    .arg(ts.amount)
     .invoke_async(&mut *connection)
     .await?;
 
@@ -225,14 +225,14 @@ impl TokenBucket {
     /// Spawn a scheduler thread to schedule wake-up times for nodes,
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
-    fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let ts = ThreadState::from(&slf);
+    fn __aenter__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let ts = ThreadState::from(self);
         future_into_py(py, async { Ok(schedule_and_sleep(ts).await?) })
     }
 
     /// Do nothing on aexit.
     #[args(_a = "*")]
-    fn __aexit__<'p>(_s: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
+    fn __aexit__<'p>(&self, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
         future_into_py(py, async { Ok(()) })
     }
 

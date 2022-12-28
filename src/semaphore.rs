@@ -18,7 +18,7 @@ struct ThreadState {
 }
 
 impl ThreadState {
-    fn from(slf: &PyRef<Semaphore>) -> Self {
+    fn from(slf: &Semaphore) -> Self {
         Self {
             connection_pool: slf.connection_pool.clone(),
             name: slf.name.clone(),
@@ -174,14 +174,14 @@ impl Semaphore {
         })
     }
 
-    fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let ts = ThreadState::from(&slf);
+    fn __aenter__<'p>(&self, py: Python<'p>) -> PyResult<&'p PyAny> {
+        let ts = ThreadState::from(self);
         future_into_py(py, async { Ok(create_and_acquire_semaphore(ts).await?) })
     }
 
     #[args(_a = "*")]
-    fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
-        let ts = ThreadState::from(&slf);
+    fn __aexit__<'p>(&self, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
+        let ts = ThreadState::from(self);
         future_into_py(py, async { Ok(release_semaphore(ts).await?) })
     }
 
