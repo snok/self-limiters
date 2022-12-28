@@ -103,7 +103,7 @@ def test_init_types(config, e):
 @pytest.mark.filterwarnings('ignore::RuntimeWarning')
 async def test_max_sleep():
     name = uuid4().hex[:6]
-    with pytest.raises(MaxSleepExceededError, match='Max sleep exceeded when waiting for Semaphore'):
+    with pytest.raises(MaxSleepExceededError, match='Max sleep exceeded waiting for Semaphore'):
         await asyncio.gather(
             *[asyncio.create_task(run(semaphore_factory(name=name, max_sleep=1), 1)) for _ in range(3)]
         )

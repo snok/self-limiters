@@ -1,7 +1,6 @@
 use bb8_redis::bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use log::debug;
-use std::sync::mpsc::Receiver;
 use std::time::Duration;
 
 use pyo3::exceptions::PyValueError;
@@ -10,11 +9,10 @@ use pyo3::types::PyTuple;
 use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::Script;
+use tokio::sync::Mutex;
 
 use crate::errors::SLError;
-use crate::utils::{
-    create_connection_manager, create_connection_pool, now_millis, send_shared_state, SLResult, REDIS_KEY_PREFIX,
-};
+use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the token bucket itself, but this seemed simpler.
@@ -40,9 +38,8 @@ impl ThreadState {
     }
 }
 
-async fn schedule_and_sleep(receiver: Receiver<ThreadState>) -> SLResult<()> {
-    // Receive class state
-    let ts = receiver.recv()?;
+async fn schedule_and_sleep(m: Mutex<ThreadState>) -> SLResult<()> {
+    let ts = m.lock().await;
 
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
@@ -209,6 +206,8 @@ impl TokenBucket {
         max_sleep: Option<f32>,
         connection_pool_size: Option<u32>,
     ) -> PyResult<Self> {
+        debug!("Creating new TokenBucket instance");
+
         if refill_frequency <= 0.0 {
             return Err(PyValueError::new_err("Refill frequency must be greater than 0"));
         }
@@ -232,8 +231,8 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let receiver = send_shared_state(ThreadState::from(&slf))?;
-        future_into_py(py, async { Ok(schedule_and_sleep(receiver).await?) })
+        let m = Mutex::new(ThreadState::from(&slf));
+        future_into_py(py, async { Ok(schedule_and_sleep(m).await?) })
     }
 
     /// Do nothing on aexit.

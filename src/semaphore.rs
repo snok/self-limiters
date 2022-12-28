@@ -9,11 +9,9 @@ use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Script};
 
 use bb8_redis::RedisConnectionManager;
-use std::sync::mpsc::Receiver;
+use tokio::sync::Mutex;
 
-use crate::utils::{
-    create_connection_manager, create_connection_pool, now_millis, send_shared_state, SLResult, REDIS_KEY_PREFIX,
-};
+use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
 /// Pure rust DTO for the data we need to pass to our thread
 /// We could pass the Semaphore itself, but this seemed simpler.
@@ -42,9 +40,8 @@ impl ThreadState {
     }
 }
 
-async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
-    // Retrieve thread state struct
-    let ts = receiver.recv()?;
+async fn create_and_acquire_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
+    let ts = m.lock().await;
 
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
@@ -110,6 +107,8 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     .await?
     {
         info!("Created new semaphore queue with a capacity of {}", &ts.capacity);
+    } else {
+        debug!("Skipped creating new semaphore queue, since one exists already")
     }
 
     // Wait for our turn - this waits non-blockingly until we're free to proceed
@@ -119,7 +118,7 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     // Raise an exception if we waited too long
     if ts.max_sleep > 0.0 && (now_millis()? - start) > (ts.max_sleep * 1000.0) as u64 {
         return Err(SLError::MaxSleepExceeded(
-            "Max sleep exceeded when waiting for Semaphore".to_string(),
+            "Max sleep exceeded waiting for Semaphore".to_string(),
         ));
     };
 
@@ -127,8 +126,8 @@ async fn create_and_acquire_semaphore(receiver: Receiver<ThreadState>) -> SLResu
     Ok(())
 }
 
-async fn release_semaphore(receiver: Receiver<ThreadState>) -> SLResult<()> {
-    let ts = receiver.recv()?;
+async fn release_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
+    let ts = m.lock().await;
 
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
@@ -176,6 +175,8 @@ impl Semaphore {
         redis_url: Option<&str>,
         connection_pool_size: Option<u32>,
     ) -> PyResult<Self> {
+        debug!("Creating new Semaphore instance");
+
         // Create redis connection manager
         let manager = create_connection_manager(redis_url)?;
 
@@ -192,15 +193,14 @@ impl Semaphore {
     }
 
     fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let receiver = send_shared_state(ThreadState::from(&slf))?;
-
-        future_into_py(py, async { Ok(create_and_acquire_semaphore(receiver).await?) })
+        let m = Mutex::new(ThreadState::from(&slf));
+        future_into_py(py, async { Ok(create_and_acquire_semaphore(m).await?) })
     }
 
     #[args(_a = "*")]
     fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
-        let receiver = send_shared_state(ThreadState::from(&slf))?;
-        future_into_py(py, async { Ok(release_semaphore(receiver).await?) })
+        let m = Mutex::new(ThreadState::from(&slf));
+        future_into_py(py, async { Ok(release_semaphore(m).await?) })
     }
 
     fn __repr__(&self) -> String {
