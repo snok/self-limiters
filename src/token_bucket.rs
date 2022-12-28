@@ -9,7 +9,6 @@ use pyo3::types::PyTuple;
 use pyo3::{PyAny, PyResult, Python};
 use pyo3_asyncio::tokio::future_into_py;
 use redis::Script;
-use tokio::sync::Mutex;
 
 use crate::errors::SLError;
 use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
@@ -38,9 +37,7 @@ impl ThreadState {
     }
 }
 
-async fn schedule_and_sleep(m: Mutex<ThreadState>) -> SLResult<()> {
-    let ts = m.lock().await;
-
+async fn schedule_and_sleep(ts: ThreadState) -> SLResult<()> {
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
 
@@ -231,8 +228,8 @@ impl TokenBucket {
     /// and let the main thread wait for assignment of wake-up time
     /// then sleep until ready.
     fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let m = Mutex::new(ThreadState::from(&slf));
-        future_into_py(py, async { Ok(schedule_and_sleep(m).await?) })
+        let ts = ThreadState::from(&slf);
+        future_into_py(py, async { Ok(schedule_and_sleep(ts).await?) })
     }
 
     /// Do nothing on aexit.

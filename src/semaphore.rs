@@ -9,7 +9,6 @@ use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Script};
 
 use bb8_redis::RedisConnectionManager;
-use tokio::sync::Mutex;
 
 use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
@@ -40,9 +39,7 @@ impl ThreadState {
     }
 }
 
-async fn create_and_acquire_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
-    let ts = m.lock().await;
-
+async fn create_and_acquire_semaphore(ts: ThreadState) -> SLResult<()> {
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
 
@@ -118,9 +115,7 @@ async fn create_and_acquire_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
     Ok(())
 }
 
-async fn release_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
-    let ts = m.lock().await;
-
+async fn release_semaphore(ts: ThreadState) -> SLResult<()> {
     // Connect to redis
     let mut connection = ts.connection_pool.get().await?;
 
@@ -185,14 +180,14 @@ impl Semaphore {
     }
 
     fn __aenter__<'p>(slf: PyRef<Self>, py: Python<'p>) -> PyResult<&'p PyAny> {
-        let m = Mutex::new(ThreadState::from(&slf));
-        future_into_py(py, async { Ok(create_and_acquire_semaphore(m).await?) })
+        let ts = ThreadState::from(&slf);
+        future_into_py(py, async { Ok(create_and_acquire_semaphore(ts).await?) })
     }
 
     #[args(_a = "*")]
     fn __aexit__<'p>(slf: PyRef<Self>, py: Python<'p>, _a: &'p PyTuple) -> PyResult<&'p PyAny> {
-        let m = Mutex::new(ThreadState::from(&slf));
-        future_into_py(py, async { Ok(release_semaphore(m).await?) })
+        let ts = ThreadState::from(&slf);
+        future_into_py(py, async { Ok(release_semaphore(ts).await?) })
     }
 
     fn __repr__(&self) -> String {
