@@ -210,7 +210,7 @@ impl TokenBucket {
         let manager = create_connection_manager(redis_url)?;
 
         // Create connection pool
-        let pool = create_connection_pool(manager, connection_pool_size.unwrap_or(15))?;
+        let pool = create_connection_pool(manager, connection_pool_size.unwrap_or(30))?;
 
         Ok(Self {
             capacity,
