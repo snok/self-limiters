@@ -75,28 +75,20 @@ async fn create_and_acquire_semaphore(m: Mutex<ThreadState>) -> SLResult<()> {
         local capacity = tonumber(ARGV[1])
 
         -- Check if list exists
-        -- SETNX does in one call what we would otherwise do in two
-        --
-        -- One thing to note about this call is that we would rather not do this. It would
-        -- be much more intuitive to call EXISTS on the list key and create the list if it
-        -- did not exist. Unfortunately, if you create a list with 3 elements, and you pop
-        -- all three elements (popping == acquiring the semaphore), the list stops 'existing'
-        -- once empty. In other words, EXISTS is not viable, so this is a workaround.
-        -- If you have better suggestions for how to achieve this, please submit a PR.
+        -- Note, we cannot use EXISTS or LLEN below, as we need
+        -- to know if a list exists, but has capacity zero.
         local does_not_exist = redis.call('SETNX', string.format(existskey, key), 1)
 
         -- Create the list if none exists
         if does_not_exist == 1 then
-            -- Add '1' as an argument equal to the capacity of the semaphore
-            -- In other words, if we passed capacity 5 here, this should
-            -- generate `{RPUSH, 1, 1, 1, 1, 1}`.
-            -- The values we push to the list are arbitrary.
-            local args = {'RPUSH', key}
-            for _=1,capacity do
-                table.insert(args, 1)
-            end
-            redis.call(unpack(args))
-            return true
+          -- Add '1' as an argument equal to the capacity of the semaphore
+          -- If capacity is 5 here, we generate `{RPUSH, 1, 1, 1, 1, 1}`.
+          local args = {'RPUSH', key}
+          for _=1,capacity do
+            table.insert(args, 1)
+          end
+          redis.call(unpack(args))
+          return true
         end
         return false",
     )
