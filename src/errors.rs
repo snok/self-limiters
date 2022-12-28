@@ -1,11 +1,12 @@
-use bb8_redis::bb8::RunError;
+extern crate redis;
+
 use std::io::Error;
 use std::sync::mpsc::{RecvError, SendError};
 use std::time::SystemTimeError;
 
-use crate::semaphore;
+use bb8_redis::bb8::RunError;
 use pyo3::create_exception;
-use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
+use pyo3::exceptions::{PyException, PyRuntimeError};
 use pyo3::prelude::*;
 use redis::RedisError as RedisLibError;
 
@@ -20,11 +21,10 @@ create_exception!(self_limiters, MaxSleepExceededError, PyException);
 /// that raise any of the mapped errors below, to automatically raise the
 /// appropriate mapped Python error.
 #[derive(Debug)]
-pub enum SLError {
+pub(crate) enum SLError {
     MaxSleepExceeded(String),
     Redis(String),
     RuntimeError(String),
-    ValueError(String),
 }
 
 // Map relevant error types to appropriate Python exceptions
@@ -34,7 +34,6 @@ impl From<SLError> for PyErr {
             SLError::MaxSleepExceeded(e) => MaxSleepExceededError::new_err(e),
             SLError::Redis(e) => RedisError::new_err(e),
             SLError::RuntimeError(e) => PyRuntimeError::new_err(e),
-            SLError::ValueError(e) => PyValueError::new_err(e),
         }
     }
 }
@@ -75,8 +74,8 @@ impl From<SystemTimeError> for SLError {
 }
 
 // RunError<RedisError> could happen when creating a connection pool
-impl From<RunError<semaphore::redis::RedisError>> for SLError {
-    fn from(e: RunError<semaphore::redis::RedisError>) -> Self {
+impl From<RunError<redis::RedisError>> for SLError {
+    fn from(e: RunError<redis::RedisError>) -> Self {
         Self::RuntimeError(e.to_string())
     }
 }

@@ -1,25 +1,20 @@
-pub extern crate redis;
-
-use crate::errors::SLError;
 use bb8_redis::bb8::Pool;
+use bb8_redis::RedisConnectionManager;
 use log::{debug, info};
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 use pyo3_asyncio::tokio::future_into_py;
 use redis::{AsyncCommands, Script};
 
-use bb8_redis::RedisConnectionManager;
-
+use crate::errors::SLError;
 use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
-/// Pure rust DTO for the data we need to pass to our thread
-/// We could pass the Semaphore itself, but this seemed simpler.
-pub struct ThreadState {
-    pub(crate) connection_pool: Pool<RedisConnectionManager>,
-    pub(crate) name: String,
-    pub(crate) expiry: usize,
-    pub(crate) capacity: u32,
-    pub(crate) max_sleep: f32,
+struct ThreadState {
+    connection_pool: Pool<RedisConnectionManager>,
+    name: String,
+    expiry: usize,
+    capacity: u32,
+    max_sleep: f32,
 }
 
 impl ThreadState {
@@ -34,7 +29,7 @@ impl ThreadState {
     }
 
     /// Key (re)use in Lua scripts to determine if Semaphore exists or not
-    pub(crate) fn exists_key(&self) -> String {
+    fn exists_key(&self) -> String {
         format!("{}-exists", self.name)
     }
 }
@@ -120,7 +115,7 @@ async fn release_semaphore(ts: ThreadState) -> SLResult<()> {
     let mut connection = ts.connection_pool.get().await?;
 
     // Push capacity back to the semaphore
-    // *We don't care about this being atomic
+    // We don't care about this being atomic
     redis::pipe()
         .lpush(&ts.name, 1)
         .expire(&ts.name, ts.expiry)
@@ -138,7 +133,7 @@ async fn release_semaphore(ts: ThreadState) -> SLResult<()> {
 #[pyclass(frozen)]
 #[pyo3(name = "Semaphore")]
 #[pyo3(module = "self_limiters")]
-pub struct Semaphore {
+pub(crate) struct Semaphore {
     #[pyo3(get)]
     name: String,
     #[pyo3(get)]

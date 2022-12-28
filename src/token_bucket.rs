@@ -1,8 +1,8 @@
+use std::time::Duration;
+
 use bb8_redis::bb8::Pool;
 use bb8_redis::RedisConnectionManager;
 use log::debug;
-use std::time::Duration;
-
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
@@ -13,15 +13,13 @@ use redis::Script;
 use crate::errors::SLError;
 use crate::utils::{create_connection_manager, create_connection_pool, now_millis, SLResult, REDIS_KEY_PREFIX};
 
-/// Pure rust DTO for the data we need to pass to our thread
-/// We could pass the token bucket itself, but this seemed simpler.
-pub struct ThreadState {
-    pub(crate) capacity: u32,
-    pub(crate) frequency: f32,
-    pub(crate) amount: u32,
-    pub(crate) max_sleep: f32,
-    pub(crate) connection_pool: Pool<RedisConnectionManager>,
-    pub(crate) name: String,
+struct ThreadState {
+    capacity: u32,
+    frequency: f32,
+    amount: u32,
+    max_sleep: f32,
+    connection_pool: Pool<RedisConnectionManager>,
+    name: String,
 }
 
 impl ThreadState {
@@ -177,7 +175,7 @@ async fn schedule_and_sleep(ts: ThreadState) -> SLResult<()> {
 #[pyclass(frozen)]
 #[pyo3(name = "TokenBucket")]
 #[pyo3(module = "self_limiters")]
-pub struct TokenBucket {
+pub(crate) struct TokenBucket {
     #[pyo3(get)]
     capacity: u32,
     #[pyo3(get)]
