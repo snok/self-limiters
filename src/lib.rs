@@ -8,6 +8,7 @@ use crate::errors::{MaxSleepExceededError, RedisError};
 use crate::semaphore::Semaphore;
 
 mod errors;
+mod generated;
 mod semaphore;
 mod token_bucket;
 mod utils;
