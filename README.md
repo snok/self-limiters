@@ -8,17 +8,18 @@
 A library for regulating traffic with respect to **concurrency** or **time**.
 
 It implements a [semaphore](https://en.wikipedia.org/wiki/Semaphore_(programming)) to be used when you need to
-limit the number of concurrent requests to an API (or other resources). For example if you can only
-send 5 concurrent requests.
+limit the number of *concurrent* requests to an API (or other resources). For example if you can at most
+send 5 requests at the same time.
 
 It also implements the [token bucket algorithm](https://en.wikipedia.org/wiki/Token_bucket) which can be used
-to limit the number of requests made in a given time interval. For example if you're restricted to 10 requests
-per second.
+to limit the number of requests made in a given time interval. For example if you're restricted to
+sending, at most, 10 requests per second.
 
-Both limiters are async, FIFO, and distributed using Redis. You should probably only use this if you need
-distributed queues.
+Both limiters are async, FIFO, and distributed using Redis. This means the limiters can be
+used across several distributed processes. If that isn't your use-case, you should probably
+look for another library which does this in memory.
 
-This was written with rate-limiting in mind, but the semaphore and token bucket
+The package was written with rate-limiting in mind, but the semaphore and token bucket
 implementations can be used for anything.
 
 # Installation
@@ -44,7 +45,10 @@ async with Semaphore(name="", capacity=5, max_sleep=60, redis_url=""):
       client.get(...)
 ```
 
-We use [`blpop`](https://redis.io/commands/blpop/) to wait for the semaphore to be freed up, under the hood, which is non-blocking.
+The `name` given is what determines whether your processes will use the same limiter or not.
+
+The semaphore implementation is largely a wrapper around the [`blpop`](https://redis.io/commands/blpop/)
+redis command. We use it to wait for the semaphore to be freed up, in a non-blocking way.
 
 If you specify a non-zero `max_sleep`, a `MaxSleepExceededError` will be raised if `blpop` waits for longer than that specified value.
 
@@ -103,52 +107,59 @@ def limit(name, capacity):
 def fetch_foo(id: UUID) -> Foo:
 ```
 
-# Implementation and performance breakdown
+# Implementation and general flow
 
-The library is written in Rust (for fun) and relies on [Lua](http://www.lua.org/about.html)
-scripts and [pipelining](https://docs.rs/redis/0.22.0/redis/struct.Pipeline.html) to
+The library is written in Rust (for fun) and more importantly, relies on
+[Lua](http://www.lua.org/about.html) scripts and
+[pipelining](https://docs.rs/redis/0.22.0/redis/struct.Pipeline.html) to
 improve the performance of each implementation.
 
 Redis lets users upload and execute Lua scripts on the server directly, meaning we can write
-e.g., the entire token bucket logic in Lua. This present a couple of nice benefits:
+e.g., the entire token bucket logic in Lua. Using Lua scripts presents a couple of nice benefits:
 
 - Since they are executed on the redis instance, we can make 1 request to redis
   where we would otherwise have to make 3 or 4. The time saved by reducing
-  the number of requests is significant.
+  the number of requests can be significant.
 
 - Redis is single-threaded and guarantees atomic execution of scripts, meaning
-  we don't have to worry about data races. In a prior iteration, when we had to make 4 requests
-  to estimate the wake-up time for a token bucket instance, we had needed to use the
-  [redlock](https://redis.com/redis-best-practices/communication-patterns/redlock/)
-  algorithm to ensure fairness. With Lua scripts, our implementations are FIFO out of the box.
+  we don't have to worry about data races. As a consequence, our implementations
+  become FIFO out of the box. Without atomic execution we'd need distributed locks to prevent race conditions, which would
+  be very expensive.
 
-So in summary they make our implementation faster, since we save several round-trips to the server
-and back **and** since we no longer need locks, and distributed locks are expensive. And they
-simultaneously make the code much, much simpler.
+So Lua scripts help make our implementation faster and simpler.
 
-This is how each implementation has ended up looking:
+This is the rough flow of execution, for each implementation:
 
 ### The semaphore implementation
 
-1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L59:L109) to create a list data structure in redis, as the foundation of the semaphore.
+1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/semaphore.lua)
+   to create a list data structure in redis, as the foundation of the semaphore.
 
    This script is idempotent, and skipped if it has already been created.
 
-2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity, and pop from the list when it does.
-3. Then run a [pipelined command](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L139:L144) to release the semaphore by adding back the capacity.
+2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity,
+   and pop from the list when it does.
 
-So in total we make 3 calls to redis, where we would have made 6 without the scripts, which are all non-blocking.
+3. Then run a [pipelined command](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L78)
+   to release the semaphore by adding back the capacity borrowed.
+
+So in total we make 3 calls to redis, which are all non-blocking.
 
 ### The token bucket implementation
 
 The token bucket implementation is even simpler. The steps are:
 
-1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/token_bucket.rs#L69:L159) to estimate and return a wake-up time.
+1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/token_bucket.lua)
+   to estimate and return a wake-up time.
+
 2. Sleep until the given timestamp.
 
-We make 1 call instead of 3, then sleep. Both are non-blocking.
+We make one call, then sleep. Both are non-blocking.
 
-In other words, the very large majority of time is spent waiting in a non-blocking way, meaning the limiters' impact on an application event-loop should be close to completely negligible.
+---------
+
+So in summary, almost all of the time is spent waiting for async i/o, meaning the limiters' impact on an
+application event-loop should be close to completely negligible.
 
 ## Benchmarks
 
@@ -164,7 +175,6 @@ to run your own tests!
 
 # Implementation reference
 
-
 ## The semaphore implementation
 
 The semaphore implementation is useful when you need to limit a process
@@ -176,7 +186,7 @@ The flow can be broken down as follows:
 
 <img width=500 src="docs/semaphore.png"></img>
 
-The initial [lua script](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L59:L109)
+The initial [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/semaphore.lua)
 first checks if the redis list we will build the semaphore on exists or not.
 It does this by calling [`SETNX`](https://redis.io/commands/setnx/) on the key of the queue plus a postfix
 (if the `name` specified in the class instantiation is "my-queue", then the queue name will be
@@ -219,7 +229,7 @@ The flow can be broken down as follows:
 
 <img width=700 src="docs/token_bucket.png"></img>
 
-Call the [schedule Lua script](https://github.com/sondrelg/self-limiters/blob/main/src/scripts/schedule.lua)
+Call the [schedule Lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/token_bucket.lua)
 which first [`GET`](https://redis.io/commands/get/)s the *state* of the bucket.
 
 The bucket state contains the last time slot scheduled and the number of tokens left for that time slot.
@@ -238,7 +248,6 @@ One thing to note, is that this would not work if it wasn't for the fact that re
 so Lua scripts on Redis are FIFO. Without this we would need locks and a lot more logic.
 
 Then we just sleep!
-
 
 # Contributing
 
