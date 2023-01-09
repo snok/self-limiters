@@ -1,7 +1,7 @@
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters.svg"></a>
-<a href="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/sondrelg/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
-<a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
-<a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="python version" src="https://img.shields.io/badge/python-3.9%2B-blue"></a>
+<a href="https://github.com/snok/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/snok/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
+<a href="https://codecov.io/gh/snok/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/snok/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+<a href="https://codecov.io/gh/snok/self-limiters/"><img alt="python version" src="https://img.shields.io/badge/python-3.9%2B-blue"></a>
 
 # Self limiters
 
@@ -132,7 +132,7 @@ This is the rough flow of execution, for each implementation:
 
 ### The semaphore implementation
 
-1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/semaphore.lua)
+1. Run a [lua script](https://github.com/snok/self-limiters/blob/main/scripts/semaphore.lua)
    to create a list data structure in redis, as the foundation of the semaphore.
 
    This script is idempotent, and skipped if it has already been created.
@@ -140,7 +140,7 @@ This is the rough flow of execution, for each implementation:
 2. Run [`BLPOP`](https://redis.io/commands/blpop/) to non-blockingly wait until the semaphore has capacity,
    and pop from the list when it does.
 
-3. Then run a [pipelined command](https://github.com/sondrelg/self-limiters/blob/main/src/semaphore.rs#L78)
+3. Then run a [pipelined command](https://github.com/snok/self-limiters/blob/main/src/semaphore.rs#L78:L83)
    to release the semaphore by adding back the capacity borrowed.
 
 So in total we make 3 calls to redis, which are all non-blocking.
@@ -149,7 +149,7 @@ So in total we make 3 calls to redis, which are all non-blocking.
 
 The token bucket implementation is even simpler. The steps are:
 
-1. Run a [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/token_bucket.lua)
+1. Run a [lua script](https://github.com/snok/self-limiters/blob/main/scripts/token_bucket.lua)
    to estimate and return a wake-up time.
 
 2. Sleep until the given timestamp.
@@ -170,7 +170,7 @@ When creating 100 instances of each implementation and calling them at the same 
 - Semaphore implementation: ~0.6ms per instance
 - Token bucket implementation: ~0.03ms per instance
 
-Take a look at the [benchmarking script](https://github.com/sondrelg/self-limiters/blob/main/src/bench.py) if you want
+Take a look at the [benchmarking script](https://github.com/snok/self-limiters/blob/main/src/bench.py) if you want
 to run your own tests!
 
 # Implementation reference
@@ -186,7 +186,7 @@ The flow can be broken down as follows:
 
 <img width=500 src="docs/semaphore.png"></img>
 
-The initial [lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/semaphore.lua)
+The initial [lua script](https://github.com/snok/self-limiters/blob/main/scripts/semaphore.lua)
 first checks if the redis list we will build the semaphore on exists or not.
 It does this by calling [`SETNX`](https://redis.io/commands/setnx/) on the key of the queue plus a postfix
 (if the `name` specified in the class instantiation is "my-queue", then the queue name will be
@@ -229,7 +229,7 @@ The flow can be broken down as follows:
 
 <img width=700 src="docs/token_bucket.png"></img>
 
-Call the [schedule Lua script](https://github.com/sondrelg/self-limiters/blob/main/scripts/token_bucket.lua)
+Call the [schedule Lua script](https://github.com/snok/self-limiters/blob/main/scripts/token_bucket.lua)
 which first [`GET`](https://redis.io/commands/get/)s the *state* of the bucket.
 
 The bucket state contains the last time slot scheduled and the number of tokens left for that time slot.
@@ -251,6 +251,6 @@ Then we just sleep!
 
 # Contributing
 
-Please do! Feedback on the implementation, issues, and PRs are all welcome. See [`CONTRIBUTING.md`](https://github.com/sondrelg/self-limiters/blob/main/CONTRIBUTING.md) for more details.
+Please do! Feedback on the implementation, issues, and PRs are all welcome. See [`CONTRIBUTING.md`](https://github.com/snok/self-limiters/blob/main/CONTRIBUTING.md) for more details.
 
 Please also consider starring the repo to raise visibility.
