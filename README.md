@@ -1,7 +1,7 @@
 <a href="https://pypi.org/project/self-limiters/"><img alt="PyPI" src="https://img.shields.io/pypi/v/self-limiters.svg"></a>
 <a href="https://github.com/snok/self-limiters/actions/workflows/publish.yml"><img alt="test status" src="https://github.com/snok/self-limiters/actions/workflows/publish.yml/badge.svg"></a>
-<a href="https://codecov.io/gh/snok/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/snok/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
-<a href="https://codecov.io/gh/snok/self-limiters/"><img alt="python version" src="https://img.shields.io/badge/python-3.9%2B-blue"></a>
+<a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
+<img alt="python version" src="https://img.shields.io/badge/python-3.9%2B-blue">
 
 # Self limiters
 
