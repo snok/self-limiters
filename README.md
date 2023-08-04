@@ -3,6 +3,13 @@
 <a href="https://codecov.io/gh/sondrelg/self-limiters/"><img alt="coverage" src="https://codecov.io/gh/sondrelg/self-limiters/branch/main/graph/badge.svg?token=Q4YJPOFC1F"></a>
 <img alt="python version" src="https://img.shields.io/badge/python-3.9%2B-blue">
 
+> Project no longer maintained
+>
+> This was a fun experiment, but since the library is i/o-bound, the long-term maintenance burden of a Rust Python plugin did not seem worth it. Instead I decided to re-implement this in Python.
+>
+> See https://github.com/otovo/redis-rate-limiters for the python version :)
+
+
 # Self limiters
 
 A library for regulating traffic with respect to **concurrency** or **time**.
