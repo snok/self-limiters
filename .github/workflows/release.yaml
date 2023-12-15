@@ -99,7 +99,7 @@ jobs:
           python-version: '3.10'
       - run: pip install -U twine
       - name: get dist artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: pypi_files
           path: dist
