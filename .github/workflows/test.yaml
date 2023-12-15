@@ -89,7 +89,7 @@ jobs:
           python bench.py tb --count 30 --iterations 30 --target 0.25
           python bench.py s --count 30 --iterations 30 --target 1.5
         if: matrix.python-version == '3.11'
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
         with:
           files: coverage.lcov,coverage.xml
         if: matrix.python-version == '3.11'
