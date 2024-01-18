@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pre-commit
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: pre-commit-cache
         with:
           path: ~/.cache/pre-commit
@@ -52,7 +52,7 @@ jobs:
         id: python-setup
         with:
           python-version: "${{ matrix.python-version }}"
-      - uses: actions/cache@v3
+      - uses: actions/cache@v4
         id: cache-venv-and-cargo
         with:
           path: |
